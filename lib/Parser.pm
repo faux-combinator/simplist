@@ -27,7 +27,7 @@ sub try {
   my ($self, $match) = @_;
   my @tokens = @{ $self->{tokens} };
 
-  my $value = eval { $match->($self); };
+  my $value = eval { $self->match($match); };
   if (!$@) {
     return $value;
   }
@@ -59,7 +59,7 @@ sub many_of {
   my ($self, $match) = @_;
 
   # force the first one not to be `try`d
-  [$match->($self), @{ $self->any_of($match) }];
+  [$self->match($match), @{ $self->any_of($match) }];
 }
 
 1;
