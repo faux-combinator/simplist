@@ -9,4 +9,7 @@ use Simplist::Lexer qw(lex);
 
 #my $parser = Simplist::Parser::new(<>);
 #$parser->print();
-pp lex("(+ 1 a)")
+my @tokens = lex("(+ (* 2 3) a)");
+pp(@tokens);
+my $parsetree = parse(\@tokens);
+pp($parsetree);
