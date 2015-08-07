@@ -2,8 +2,7 @@ package Simplist::Parser;
 use Modern::Perl;
 use Exporter qw(import);
 use vars qw(@EXPORT_OK);
-use Parser;
-use Data::Dump 'pp';
+use FauxCombinator::Parser;
 
 @EXPORT_OK = qw(parse);
 
@@ -32,7 +31,7 @@ sub lst {
 }
 
 sub parse {
-  my $parser = Parser::new(shift);
+  my $parser = FauxCombinator::Parser::new(shift);
   $parser->match(\&expr);
 }
 

@@ -2,7 +2,7 @@ package Simplist::Lexer;
 use Modern::Perl;
 use Exporter 'import';
 use vars qw(@EXPORT_OK);
-use Lexer;
+use FauxCombinator::Lexer;
 
 @EXPORT_OK = qw(lex);
 
@@ -14,5 +14,5 @@ my @rules = (
 );
 
 sub lex {
-  return Lexer::lex(\@rules, shift);
+  return FauxCombinator::Lexer::lex(\@rules, shift);
 }
