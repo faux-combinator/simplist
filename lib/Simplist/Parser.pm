@@ -35,9 +35,9 @@ sub lst {
 sub call {
   my $parser = shift;
   $parser->expect('lparen');
-  my @exprs = @{$parser->many_of(\&expr)};
+  my $exprs = $parser->many_of(\&expr);
   $parser->expect('rparen');
-  {type => 'call', exprs => \@exprs}
+  {type => 'call', exprs => $exprs}
 }
 
 sub parse {
