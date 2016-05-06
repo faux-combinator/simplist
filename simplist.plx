@@ -9,7 +9,7 @@ use Simplist::Lexer qw(lex);
 
 #my $parser = Simplist::Parser::new(<>);
 #$parser->print();
-my @tokens = lex("(+ (* 2 3) a)");
+my @tokens = lex("(+ (* 2 3) a (length '(1 2 3)))");
 pp(@tokens);
 my $parsetree = parse(\@tokens);
 pp($parsetree);

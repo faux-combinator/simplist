@@ -19,7 +19,17 @@ sub literal {
 }
 
 sub expr {
-  shift->one_of(\&call, \&literal);
+  shift->one_of(\&lst, \&call, \&literal);
+}
+
+sub lst {
+  my $parser = shift;
+  $parser->expect('quote');
+  $parser->expect('lparen');
+  my $exprs = $parser->many_of(\&expr);
+  $parser->expect('rparen');
+  {type => 'list', values => $exprs}
+  # TODO traverse and replace calls with lists?
 }
 
 sub call {

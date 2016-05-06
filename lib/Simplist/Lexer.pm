@@ -9,6 +9,7 @@ use FauxCombinator::Lexer;
 my @rules = (
   [ qr/\(/, 'lparen' ],
   [ qr/\)/, 'rparen' ],
+  [ qr/'/, 'quote' ],
   [ qr/[0-9]+/, 'num' ],
   [ qr{[a-z+*/-]+}, 'id' ] 
 );
