@@ -26,10 +26,11 @@ sub lst {
   my $parser = shift;
   $parser->expect('quote');
   $parser->expect('lparen');
-  my $exprs = $parser->many_of(\&expr);
+  my @exprs = @{$parser->many_of(\&expr)};
   $parser->expect('rparen');
-  {type => 'list', values => $exprs}
-  # TODO traverse and replace calls with lists?
+
+  unshift @exprs, {type => 'id', value => 'quote'};
+  {type => 'call', exprs => \@exprs}
 }
 
 sub call {
