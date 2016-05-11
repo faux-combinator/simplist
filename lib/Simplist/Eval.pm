@@ -1,7 +1,7 @@
 package Simplist::Eval;
 use Modern::Perl;
 use Exporter qw(import);
-use List::Util qw(sum);
+use Simplist::Scope qw(root_scope);
 use Data::Dump qw(pp);
 use vars qw(@EXPORT_OK);
 
@@ -9,37 +9,38 @@ use vars qw(@EXPORT_OK);
 
 sub evaluate {
   my $runtime = bless {nodes => shift};
-  evaluate_nodes($runtime, $runtime->{nodes});
+  my $scope = root_scope;
+  evaluate_nodes($runtime, $scope, $runtime->{nodes});
 }
 
 sub evaluate_nodes {
-  my ($runtime, $nodes) = @_;
+  my ($runtime, $scope, $nodes) = @_;
   my @values;
   while (my $node = shift @{$nodes}) {
     my $method = "run_$node->{type}";
     # TODO pass scope or some other stuff
-    push @values, $runtime->$method($node);
+    push @values, $runtime->$method($scope, $node);
   }
   @values
 }
 
-sub add {
-  sum @_
-};
-
 sub run_call {
-  my ($runtime, $node) = @_;
-  my $function = shift @{$node->{exprs}};
-  my @values = evaluate_nodes $runtime, $node->{exprs};
+  my ($runtime, $scope, $node) = @_;
+  my $fn = shift @{$node->{exprs}};
+  die "not callable" unless $fn->{type} eq "id";
+  my @values = evaluate_nodes($runtime, $scope, $node->{exprs});
 
-  add @values;
+  my $symbol = $scope->resolve($fn->{value});
+  die unless ref($symbol) eq "CODE";
+  $symbol->(@values);
 };
 
 sub run_num {
-  my ($runtime, $node) = @_;
+  my ($runtime, $scope, $node) = @_;
   $node->{value};
 };
 
 sub run_id {
-  die 'scopes NYI, sorry';
+  my ($runtime, $scope, $node);
+  $scope->resolve($node->{value});
 }
