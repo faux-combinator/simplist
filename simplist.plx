@@ -11,7 +11,7 @@ use Simplist::Eval qw(evaluate);
 #my $parser = Simplist::Parser::new(<>);
 #$parser->print();
 #my @tokens = lex("(+ (* 2 3) a (length '(1 2 3)))");
-my @tokens = lex("(+ 1 0 (* 2 3) ten)");
+my @tokens = lex("(+ 1 0 (* 2 3) (let value 3 (+ value (let value (* 10 10) value) value)))");
 pp(@tokens);
 my $parsetree = parse(\@tokens);
 pp($parsetree);
