@@ -8,7 +8,7 @@ use vars qw(@EXPORT_OK);
 
 @EXPORT_OK = qw(evaluate);
 
-my @specials = qw(let);
+my @specials = qw(let quote);
 
 sub evaluate {
   my $runtime = bless {nodes => shift};
@@ -39,10 +39,10 @@ sub run_call {
     my $method = "run_$fn->{value}";
     return $runtime->$method($scope, $node);
   }
-  my @values = evaluate_nodes($runtime, $scope, $node->{exprs});
+  my @values = evaluate_nodes($runtime, $scope, $node>{exprs});
 
   my $symbol = $scope->resolve($fn->{value});
-  die unless ref($symbol) eq "CODE";
+  die unless ref($symbol) eq "CODE"; # TODO should check for ->type (to allow for user-defined functions)
   $symbol->(@values);
 }
 
@@ -55,11 +55,30 @@ sub run_let {
   return evaluate_node($runtime, $new_scope, $expr);
 }
 
-sub run_num {
+sub run_quote {
   my ($runtime, $scope, $node) = @_;
-  $node->{value};
+  my @values;
+
+  while (my $expr = shift @{$node->{exprs}}) {
+    # TODO need to deeply replace calls with arrays
+    die "calls in quote NYI" if $expr->{type} eq "call";
+    # rewrite `id` to `str` (XXX should be symbol?)
+    $expr->{type} = "str" if $expr->{type} eq "id";
+    push @values, $expr;
+  }
+  return {
+    type => 'array',
+    exprs => \@values,
+  };
 }
 
+# DONE
+sub run_num {
+  my ($runtime, $scope, $node) = @_;
+  $node;
+}
+
+# TODO change scope
 sub run_id {
   my ($runtime, $scope, $node) = @_;
   $scope->resolve($node->{value});
