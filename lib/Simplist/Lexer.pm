@@ -10,10 +10,12 @@ my @rules = (
   [ qr/\(/, 'lparen' ],
   [ qr/\)/, 'rparen' ],
   [ qr/'/, 'quote' ],
-  [ qr/[0-9]+/, 'num' ],
-  [ qr{[a-z+*/-]+}, 'id' ] 
+  [ qr/\d+/, 'num' ],
+  [ qr{[a-z+*/-]+}, 'id' ],
 );
 
 sub lex {
   return FauxCombinator::Lexer::lex(\@rules, shift);
 }
+
+1;

@@ -26,7 +26,8 @@ sub lst {
   my $parser = shift;
   $parser->expect('quote');
   $parser->expect('lparen');
-  my @exprs = @{$parser->many_of(\&expr)};
+  # TODO this should "commit"
+  my @exprs = @{$parser->any_of(\&expr)};
   $parser->expect('rparen');
 
   unshift @exprs, {type => 'id', value => 'quote'};
@@ -36,6 +37,7 @@ sub lst {
 sub call {
   my $parser = shift;
   $parser->expect('lparen');
+  # TODO this should "commit"
   my $exprs = $parser->many_of(\&expr);
   $parser->expect('rparen');
   {type => 'call', exprs => $exprs}
@@ -43,7 +45,7 @@ sub call {
 
 sub parse {
   my $parser = FauxCombinator::Parser::new(shift);
-  $parser->match(\&expr);
+  $parser->many_of(\&expr);
 }
 
 1;
