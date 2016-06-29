@@ -3,6 +3,7 @@ use Modern::Perl;
 use Exporter qw(import);
 use vars qw(@EXPORT_OK);
 use FauxCombinator::Parser;
+use Data::Dump qw(pp);
 
 @EXPORT_OK = qw(parse);
 
@@ -18,29 +19,24 @@ sub literal {
   shift->one_of(\&num, \&id);
 }
 
-sub expr {
-  shift->one_of(\&lst, \&call, \&literal);
-}
-
-sub lst {
-  my $parser = shift;
-  $parser->expect('quote');
-  $parser->expect('lparen');
-  # TODO this should "commit"
-  my @exprs = @{$parser->any_of(\&expr)};
-  $parser->expect('rparen');
-
-  unshift @exprs, {type => 'id', value => 'quote'};
-  {type => 'call', exprs => \@exprs}
-}
-
 sub call {
   my $parser = shift;
   $parser->expect('lparen');
-  # TODO this should "commit"
-  my $exprs = $parser->many_of(\&expr);
+  my $exprs = $parser->any_of(\&expr);
   $parser->expect('rparen');
-  {type => 'call', exprs => $exprs}
+  {type => 'list', exprs => $exprs}
+}
+
+sub quote {
+  my $parser = shift;
+  $parser->expect('quote');
+  my $expr = $parser->match(\&expr);
+
+  {type => 'quote', expr => $expr}
+}
+
+sub expr {
+  shift->one_of(\&quote, \&call, \&literal);
 }
 
 sub parse {

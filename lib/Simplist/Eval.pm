@@ -8,12 +8,13 @@ use vars qw(@EXPORT_OK);
 
 @EXPORT_OK = qw(evaluate);
 
-my @specials = qw(let quote lambda);
+# TODO let should just be a macro that uses lambda underneath...
+my @specials = qw(let lambda eval);
 
-sub evaluate {
-  my $runtime = bless {nodes => shift};
-  my $scope = root_scope;
-  evaluate_nodes($runtime, $scope, $runtime->{nodes});
+sub evaluate_node {
+  my ($runtime, $scope, $node) = @_;
+  my $method = "run_$node->{type}";
+  $runtime->$method($scope, $node);
 }
 
 sub evaluate_nodes {
@@ -21,33 +22,38 @@ sub evaluate_nodes {
   map { evaluate_node($runtime, $scope, $_) } @{$nodes};
 }
 
-sub evaluate_node {
-  my ($runtime, $scope, $node) = @_;
-  my $method = "run_$node->{type}";
-  return $runtime->$method($scope, $node);
+sub is_special_call {
+  my $fn = shift;
+  $fn->{type} eq "id" && any { $_ eq $fn->{value} } @specials;
 }
 
 # (CALLABLE PARAM...)
 # TODO cleanup this mess.
 # extract the scope-resolve code
 #  and probably the dispatch on fn/primitive_call
-sub run_call {
+sub run_list {
   my ($runtime, $scope, $node) = @_;
+  die "invalid call: empty call" unless @{$node->{exprs}};
   my $fn = shift @{$node->{exprs}};
-  if ($fn->{type} eq "id" && any { $_ eq $fn->{value} } @specials) {
+  if (is_special_call($fn)) {
     my $method = "run_$fn->{value}";
     return $runtime->$method($scope, $node);
   }
 
   $fn = evaluate_node($runtime, $scope, $fn);
   my @values = evaluate_nodes($runtime, $scope, $node->{exprs});
-  die "not callable" unless $fn->{type} =~ /fn$/;
+  die "not callable: $fn->{type}" unless $fn->{type} =~ /fn$/;
 
   if ($fn->{type} eq 'primitive_fn') {
     $fn->{value}(@values);
   } else {
     $runtime->run_lambda_call($scope, $fn, \@values);
   }
+}
+
+sub run_primitive_fn {
+  my ($runtime, $scope, $node) = @_;
+  $node;
 }
 
 sub check_argument_count {
@@ -82,6 +88,20 @@ sub run_let {
   return evaluate_node($runtime, $new_scope, $expr);
 }
 
+# (eval EXPR)
+# NOTE: (eval (list + 34 56))
+#       will currently fail to eval because + will have been evaluate_node'd,
+#       and thus it will be (0 34 56) (0 = empty call of +)
+sub run_eval {
+  my ($runtime, $scope, $node) = @_;
+  my @exprs = @{$node->{exprs}};
+  die "eval can only eval one thing" if @exprs != 1;
+  
+  my ($expr) = @exprs;
+  my $result = evaluate_node($runtime, $scope, $expr);
+  evaluate_node($runtime, $scope, $result);
+};
+
 # (lambda (PARAM ...) BODY)
 sub run_lambda {
   my ($runtime, $scope, $node) = @_;
@@ -106,22 +126,20 @@ sub run_lambda {
   $node;
 }
 
-# '(EXPR ...)
+# 'EXPR
 sub run_quote {
   my ($runtime, $scope, $node) = @_;
   my @values;
 
-  for my $expr (@{$node->{exprs}}) {
-    # TODO need to deeply replace calls with arrays
-    die "calls in quote NYI" if $expr->{type} eq "call";
-    # rewrite `id` to `str` (XXX should be symbol or what?)
-    $expr->{type} = "str" if $expr->{type} eq "id";
-    push @values, $expr;
-  }
-  return {
-    type => 'array',
-    exprs => \@values,
-  };
+
+  #for my $expr (@{$node->{exprs}}) {
+  #  die "nested not handled" if $expr->{type} eq "list";
+  #  # TODO need to deeply replace calls with arrays
+  #  # rewrite `id` to `str` (XXX should be symbol or what?)
+  #  $expr->{type} = "symbol" if $expr->{type} eq "id";
+  #  push @values, $expr;
+  #}
+  return $node->{expr};
 }
 
 sub run_num {
@@ -132,6 +150,14 @@ sub run_num {
 sub run_id {
   my ($runtime, $scope, $node) = @_;
   $scope->resolve($node->{value});
+}
+
+sub evaluate {
+  my $runtime = bless {nodes => shift};
+  my $scope = root_scope;
+  my @results = evaluate_nodes($runtime, $scope, $runtime->{nodes});
+  # only return the last result
+  $results[-1];
 }
 
 1;

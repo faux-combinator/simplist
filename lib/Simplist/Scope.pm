@@ -19,6 +19,15 @@ sub root_scope {
       };
     },
   };
+  $scope->{names}{'list'} = {
+    type => 'primitive_fn',
+    value => sub {
+      return {
+        type => 'list',
+        exprs => \@_
+      };
+    },
+  };
 
   $scope
 };
@@ -45,14 +54,5 @@ sub resolve {
   return $scope->{parent}->resolve($id) if defined $scope->{parent};
   die "no such identifier: $id";
 }
-
-#  $scope->{names}{length} = sub {
-#    my $array = shift;
-#    scalar @{$array};
-#  };
-#  $scope->{names}{at} = sub {
-#    my ($array, $index) = @_;
-#    return $array->[$index];
-#  };
 
 1;

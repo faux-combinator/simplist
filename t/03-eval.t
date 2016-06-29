@@ -1,5 +1,7 @@
 use Modern::Perl;
 use Test::More;
+use Test::Fatal;
+use Data::Dump qw(pp);
 use Simplist::Lexer qw(lex);
 use Simplist::Parser qw(parse);
 use Simplist::Eval qw(evaluate);
@@ -22,10 +24,13 @@ is_deeply run('(+ 1)'), {type => 'num', value => 1},
 is_deeply run('(+ 1 2 3)'), {type => 'num', value => 6},
   "Multi-values call";
 
+# TODO ensure let allows to redefine primitives
 is_deeply run('(let a 3 a)'), {type => 'num', value => 3},
   "Let";
 is_deeply run('(let a 3 (let b 4 a))'), {type => 'num', value => 3},
   "Let over Let";
+is_deeply run('(let a 3 (let a 4 a))'), {type => 'num', value => 4},
+  "Let over Let (same name)";
 is_deeply run('(let a 3 (let b 4 (+ a b)))'), {type => 'num', value => 7},
   "Let over Let, with body";
 
@@ -39,6 +44,94 @@ is_deeply run('
   (lambda (x) (+ val x)))
   4)
 '), {type => 'num', value => 7},
-  "Lambda as value";
+  "Let over lambda";
+
+is_deeply run('
+((let val 10
+  (let val 3
+    (lambda (x) (+ val x))))
+  4)
+'), {type => 'num', value => 7},
+  "Let over lambda";
+
+is_deeply run('
+(let x 3
+  (let fn (lambda (x) x)
+    (fn 7)))
+'), {type => 'num', value => 7},
+  "Let over lambda - lambda params take over lexical scope";
+
+is_deeply run('
+(let fn (lambda (x) x)
+  (let x 3 (fn 7)))
+'), {type => 'num', value => 7},
+  "Let over lambda - lambda params take over dynamic scope";
+
+is_deeply run('((lambda (x) (let x 3 x)) 7)'), {type => 'num', value => 3},
+  "Let over lambda - let in lambda take over let params";
+
+is_deeply run('(list 1 2)'), {
+  type => 'list',
+  exprs => [
+    {type => 'num', value => 1},
+    {type => 'num', value => 2},
+  ]}, "A list";
+
+is_deeply run('(list 4 (+ 1 2))'), {
+  type => 'list',
+  exprs => [
+    {type => 'num', value => 4},
+    {type => 'num', value => 3},
+  ]}, "A list, correct evaluation context";
+
+{
+  my $deep_list = {
+    type => 'list',
+    exprs => [
+      {type => 'num', value => 1},
+      {type => 'list', exprs => [
+          {type => 'num', value => 2},
+          {type => 'list', exprs => [
+              {type => 'num', value => 3},
+  ]}]}]};
+
+  is_deeply run('(list 1 (list 2 (list 3)))'), $deep_list, "A list";
+  is_deeply run("'(1 (2 (3)))"), $deep_list, "A list";
+}
+
+# TODO test empty lists
+{
+  my $result = run('(list + 2 (+ 2 1))');
+  # remove the "CODE" part of the sub
+  undef $result->{exprs}[0]->{value};
+  is_deeply $result, {type => 'list', exprs => [
+      {type => 'primitive_fn', value => undef},
+      {type => 'num', value => 2},
+      {type => 'num', value => 3},
+    ]}, "Lists";
+}
+
+is_deeply run('(eval (list + 1 2))'), {type => 'num', value => 3},
+  "Eval works";
+
+is_deeply run("((eval '+))"), {type => 'num', value => 0},
+  "Eval resolves quoted stuff";
+
+is_deeply run("((eval (eval ''+)))"), {type => 'num', value => 0},
+  "Eval resolves quoted stuff... twice";
+
+is_deeply run("''+"), {type => 'quote', expr => {type => 'id', value => '+'}},
+  "Quote will wrap values";
+
+is_deeply run("
+((let fn
+  (let + (lambda () 15) '+)
+  (eval fn))
+ 3)
+"), {type => 'num', value => 3},
+  "Quoting an identifier delays its resolution";
+
+like(exception { run('()'); }, qr/invalid call/,
+  "Empty calls are invalid");
 
 done_testing;
