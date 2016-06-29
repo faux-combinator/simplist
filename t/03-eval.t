@@ -120,6 +120,18 @@ is_deeply run("((eval '+))"), {type => 'num', value => 0},
 is_deeply run("((eval (eval ''+)))"), {type => 'num', value => 0},
   "Eval resolves quoted stuff... twice";
 
+is_deeply run("(eval '(+ 1 (+ 2 3)))"), {type => 'num', value => 6},
+  "Eval works at every level";
+
+is_deeply run("(eval '(list 1 '(+ 1 2)))"), {
+  type => 'list', exprs => [
+    {type => 'num', value => 1},
+    {type => 'list', exprs => [
+        {type => 'id', value => '+'},
+        {type => 'num', value => 1},
+        {type => 'num', value => 2},
+] } ] }, "Quote in quote works";
+
 is_deeply run("''+"), {type => 'quote', expr => {type => 'id', value => '+'}},
   "Quote will wrap values";
 

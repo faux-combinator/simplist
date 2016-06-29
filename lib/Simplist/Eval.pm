@@ -89,9 +89,6 @@ sub run_let {
 }
 
 # (eval EXPR)
-# NOTE: (eval (list + 34 56))
-#       will currently fail to eval because + will have been evaluate_node'd,
-#       and thus it will be (0 34 56) (0 = empty call of +)
 sub run_eval {
   my ($runtime, $scope, $node) = @_;
   my @exprs = @{$node->{exprs}};
