@@ -133,7 +133,7 @@ is_deeply run("(eval '(list 1 '(+ 1 2)))"), {
 ] } ] }, "Quote in quote works";
 
 is_deeply run("''+"), {type => 'quote', expr => {type => 'id', value => '+'}},
-  "Quote will wrap values";
+  "Quote will wrap and wrap";
 
 is_deeply run("
 ((let fn
@@ -142,6 +142,13 @@ is_deeply run("
  3)
 "), {type => 'num', value => 3},
   "Quoting an identifier delays its resolution";
+
+is_deeply run("
+(let fn (lambda (id x y) (+ y (eval id)))
+  (let x 10
+    (fn 'x 5 x)))
+"), {type => 'num', value => 15},
+  "Quoting in function context";
 
 like(exception { run('()'); }, qr/invalid call/,
   "Empty calls are invalid");
