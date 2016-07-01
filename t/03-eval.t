@@ -178,6 +178,23 @@ is_deeply run("
 "), {type => 'num', value => 6},
   "macros are evaluated in their lexical scope";
 
+is_deeply run("
+(let m (let id 5
+          (macro (name)
+            (eval name)))
+  (m id))
+"), {type => 'num', value => 5},
+  "macros can eval their arguments";
+
+is_deeply run("
+(let m
+  (let id 'x
+    (macro (name)
+      (eval name)))
+  (let x 3 (m id)))
+"), {type => 'num', value => 3},
+  "macros respect both scopes at the same time";
+
 like(exception { run('()'); }, qr/invalid call/,
   "Empty calls are invalid");
 

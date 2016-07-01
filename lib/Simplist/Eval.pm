@@ -78,9 +78,8 @@ sub run_lambda_call {
 
 sub run_macro_call {
   my ($runtime, $outer_scope, $fn, $values) = @_;
-  my $result = run_lambda_call(@_);
   # eval the code in outer_scope, not the macro's scope
-  return $runtime->evaluate_node($outer_scope, $result);
+  return $runtime->evaluate_node($outer_scope, run_lambda_call(@_));
 }
 
 # (let NAME VALUE EXPR)
