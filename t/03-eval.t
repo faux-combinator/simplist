@@ -117,6 +117,12 @@ is_deeply run('(eval (list + 1 2))'), {type => 'num', value => 3},
 is_deeply run("((eval '+))"), {type => 'num', value => 0},
   "Eval resolves quoted stuff";
 
+is_deeply run("(eval (eval (eval +)))")->{type}, "primitive_fn",
+  "A primitive function evaluates to itself";
+
+is_deeply run("(eval (eval (eval (lambda () 1))))")->{type}, "fn",
+  "A primite function evaluates to itself";
+
 is_deeply run("((eval (eval ''+)))"), {type => 'num', value => 0},
   "Eval resolves quoted stuff... twice";
 
@@ -149,6 +155,28 @@ is_deeply run("
     (fn 'x 5 x)))
 "), {type => 'num', value => 15},
   "Quoting in function context";
+
+is_deeply run("
+(let m (macro () 'value)
+  (let value 10
+    (m)))
+"), {type => 'num', value => 10},
+  "MACROS (macro's return value is evaluated in the calling scope)";
+
+is_deeply run("
+(let mylet (macro (name value body)
+              (list (list 'lambda (list name) body) value))
+  (mylet a 5 (+ 3 a)))
+"), {type => 'num', value => 8},
+  "Macros can be used to reimplement let";
+
+is_deeply run("
+(let m (let name 'id
+          (macro (value body)
+            (list 'let name value body)))
+  (m 3 (+ id id)))
+"), {type => 'num', value => 6},
+  "macros are evaluated in their lexical scope";
 
 like(exception { run('()'); }, qr/invalid call/,
   "Empty calls are invalid");

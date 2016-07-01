@@ -9,7 +9,7 @@ use vars qw(@EXPORT_OK);
 @EXPORT_OK = qw(evaluate);
 
 # TODO let should just be a macro that uses lambda underneath...
-my @specials = qw(let lambda eval);
+my @specials = qw(let lambda eval macro);
 
 sub evaluate_node {
   my ($runtime, $scope, $node) = @_;
@@ -41,19 +41,17 @@ sub run_list {
   }
 
   $fn = evaluate_node($runtime, $scope, $fn);
+  if ($fn->{macro}) {
+    return $runtime->run_macro_call($scope, $fn, $node->{exprs});
+  }
   my @values = evaluate_nodes($runtime, $scope, $node->{exprs});
   die "not callable: $fn->{type}" unless $fn->{type} =~ /fn$/;
 
   if ($fn->{type} eq 'primitive_fn') {
-    $fn->{value}(@values);
+    return $fn->{value}(@values);
   } else {
     $runtime->run_lambda_call($scope, $fn, \@values);
   }
-}
-
-sub run_primitive_fn {
-  my ($runtime, $scope, $node) = @_;
-  $node;
 }
 
 sub check_argument_count {
@@ -64,7 +62,7 @@ sub check_argument_count {
 }
 
 sub run_lambda_call {
-  # $outer_scope is the dynamic scope.
+  # $outer_scope is the dynamic scope. we do not need it right now
   my ($runtime, $outer_scope, $fn, $values) = @_;
   my $scope = $fn->{scope};
   my @param_names = @{$fn->{param_names}};
@@ -76,6 +74,13 @@ sub run_lambda_call {
   }
 
   evaluate_node($runtime, $new_scope, $fn->{body});
+}
+
+sub run_macro_call {
+  my ($runtime, $outer_scope, $fn, $values) = @_;
+  my $result = run_lambda_call(@_);
+  # eval the code in outer_scope, not the macro's scope
+  return $runtime->evaluate_node($outer_scope, $result);
 }
 
 # (let NAME VALUE EXPR)
@@ -123,20 +128,27 @@ sub run_lambda {
   $node;
 }
 
+# (macro (PARAM ...) BODY)
+sub run_macro {
+  my $node = run_lambda(@_);
+  $node->{macro} = 1;
+  $node;
+};
+
 # 'EXPR
 sub run_quote {
   my ($runtime, $scope, $node) = @_;
-  my @values;
-
-
-  #for my $expr (@{$node->{exprs}}) {
-  #  die "nested not handled" if $expr->{type} eq "list";
-  #  # TODO need to deeply replace calls with arrays
-  #  # rewrite `id` to `str` (XXX should be symbol or what?)
-  #  $expr->{type} = "symbol" if $expr->{type} eq "id";
-  #  push @values, $expr;
-  #}
   return $node->{expr};
+}
+
+sub run_fn {
+  my ($runtime, $scope, $node) = @_;
+  $node;
+}
+
+sub run_primitive_fn {
+  my ($runtime, $scope, $node) = @_;
+  $node;
 }
 
 sub run_num {
