@@ -195,6 +195,14 @@ is_deeply run("
 "), {type => 'num', value => 3},
   "macros respect both scopes at the same time";
 
+is_deeply run("
+(let outer
+  (macro ()
+    (list 'macro (list) (list '+ 3 4)))
+  ((outer)))
+"), {type => 'num', value => 7},
+"macros can be returned from macros";
+
 like(exception { run('()'); }, qr/invalid call/,
   "Empty calls are invalid");
 
