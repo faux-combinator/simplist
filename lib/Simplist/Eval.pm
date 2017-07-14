@@ -19,7 +19,7 @@ sub evaluate_node {
 
 sub evaluate_nodes {
   my ($runtime, $scope, $nodes) = @_;
-  map { evaluate_node($runtime, $scope, $_) } @{$nodes};
+  map { evaluate_node($runtime, $scope, $_) } @$nodes;
 }
 
 sub is_special_call {
@@ -68,7 +68,7 @@ sub run_lambda_call {
   my @param_names = @{$fn->{param_names}};
 
   my $new_scope = $scope->child;
-  my @values = @{$values};
+  my @values = @$values;
   for my $name (@param_names) {
     $new_scope->assign($name, shift @values);
   }
