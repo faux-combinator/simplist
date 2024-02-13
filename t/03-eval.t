@@ -264,8 +264,10 @@ like(exception { run('(let m (macro () (import std (list)) \'(list 1 2)) (m))') 
   qr/no such identifier: list/,
   "imports don't cross macro phases");
 
-# XXX invalid import variable
-# XXX importing doesn't pollute the current scope
+like(exception { run('(import std (abcdef))') },
+  qr/Package std has no abcdef/,
+  "Cannot import variables that don't exist");
+
 # XXX import-as
 
 like(exception { run('(import x ())') },
@@ -279,6 +281,10 @@ like(exception { run('(import x ())') },
 (import std (+))
 (add3 (+ a b))
 "), { type => 'num', value => 6 }, "Can import a library!";
+
+  like(exception { run('(import mylib (a b)) (+ a b)') },
+    qr/no such identifier: \+/,
+    "Import doesn't pollute the current scope");
 }
 
 done_testing;

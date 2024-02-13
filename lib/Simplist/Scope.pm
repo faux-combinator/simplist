@@ -7,19 +7,24 @@ use Data::Dump qw(pp);
 @EXPORT_OK = qw(root_scope);
 
 sub root_scope {
-  bless {}
+  bless {type => 'root', export => {}}
 };
 
 sub child {
-  my $parent = shift;
-  my $scope = bless {};
-  $scope->{parent} = $parent;
-  $scope
+  my ($parent, $type) = @_;
+  bless {parent => $parent, type => $type};
 }
 
 sub assign {
   my ($scope, $name, $value) = @_;
   $scope->{names}{$name} = $value;
+}
+
+sub export {
+  my ($scope, $name, $value) = @_;
+  die "Cannot export outside root scope" unless $scope->{type} eq 'root';
+  $scope->{export}{$name} = $value;
+  $scope->assign($name, $value);
 }
 
 sub set {

@@ -38,8 +38,7 @@ sub run_export {
   my ($name, $value) = @{$node->{exprs}};
   die "Exported name should be a static identifier" unless $name->{type} eq 'id';
   my $result = evaluate_node($runtime, $scope, $value);
-  $runtime->{export}{$name->{value}} = $result;
-  $scope->assign($name->{value}, $result);
+  $scope->export($name->{value}, $result);
   $result # If it's the last statement
 }
 
@@ -112,7 +111,7 @@ sub run_lambda_call {
   my $scope = $fn->{scope};
   my @param_names = @{$fn->{param_names}};
 
-  my $new_scope = $scope->child;
+  my $new_scope = $scope->child('function');
   my @values = @$values;
   for my $name (@param_names) {
     $new_scope->assign($name, shift @values);
@@ -133,7 +132,7 @@ sub run_let {
   my ($runtime, $scope, $node) = @_;
   my ($name, $value, $expr) = @{$node->{exprs}};
   die "cannot let a non-id" unless $name->{type} eq "id";
-  my $new_scope = $scope->child;
+  my $new_scope = $scope->child('let');
   $new_scope->assign($name->{value}, evaluate_node($runtime, $scope, $value));
   return evaluate_node($runtime, $new_scope, $expr);
 }
@@ -207,11 +206,11 @@ sub run_id {
 
 sub evaluate {
   my ($nodes) = @_;
-  my $runtime = bless {export => {}};
+  my $runtime = bless {};
   my $scope = root_scope;
   my @results = evaluate_nodes($runtime, $scope, $nodes);
   # only return the last result
-  return { value => $results[-1], export => $runtime->{export} };
+  return { value => $results[-1], export => $scope->{export} };
 }
 
 1;
