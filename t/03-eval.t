@@ -233,6 +233,15 @@ is_deeply run("1 2 3"), {type => 'num', value => 3},
 like(exception { run('()'); }, qr/invalid call/,
   "Empty calls are invalid");
 
+is_deeply run('(def a 1) (def b 2) (import std (+)) (+ a b)'),
+  {type => 'num', value => 3},
+  'def values';
+# TODO error: `(def)`
+# TODO error: `(def a)`
+# TODO error: `(def a b foobar)`
+# TODO error: `(def (not-an-id) 1)`
+# TODO error: def nested in lambda etc
+
 is_deeply check("(export a 1)"), {
   value => {type => 'num', value => 1},
   export => {a => {type => 'num', value => 1}}
@@ -249,6 +258,9 @@ is_deeply check("(import std (+)) (export a 1) (export b (+ a 1)) (+ a b)"), {
 like(exception { run('((lambda () (export a 1)))') }, qr/top-level/,
   "Cannot have an export inside ane expr");
 
+
+
+# XXX allow export in `let`s 
 #is_deeply check("(let start 1 (export a start) (export b start))"), {
 #  value => {type => 'num', value => 1},
 #  export => {
@@ -308,5 +320,7 @@ like(exception { run('(import x ())') },
   });
   is $stdout, "123\n", "module only loads once";
 }
+
+# TODO test imported macro
 
 done_testing;

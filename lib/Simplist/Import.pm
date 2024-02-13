@@ -4,6 +4,7 @@ use Exporter qw(import);
 use vars qw(@EXPORT_OK);
 use File::Slurp;
 use List::Util qw(sum0 product all);
+use Data::Dump qw(pp);
 
 @EXPORT_OK = qw(resolve_import);
 
@@ -18,6 +19,18 @@ my $stdlib = {
       };
     },
   },
+
+  '+' => {
+    type => 'primitive_fn',
+    value => sub {
+      die unless all { $_->{type} eq 'num'; } @_;
+      return {
+        type => 'num',
+        value => sum0(map { $_->{value} } @_)
+      };
+    },
+  },
+
   'list' => {
     type => 'primitive_fn',
     value => sub {
@@ -27,6 +40,35 @@ my $stdlib = {
       };
     },
   },
+
+  'list/at' => {
+    type => 'primitive_fn',
+    value => sub {
+      die "Needs an array and an index" unless @_ eq 2;
+      my ($array, $idx) = @_;
+      die "Can only index lists" unless $array->{type} eq 'list';
+      my $len = scalar @{$array->{exprs}};
+
+      die "Index needs to be a number" unless $idx->{type} eq 'num';
+      my $index = $idx->{value};
+
+      die "Index $index is out of bounds for array of size $len" if $index < 0 or $index >= $len;
+      return $array->{exprs}[$index];
+    },
+  },
+
+  'list/length' => {
+    type => 'primitive_fn',
+    value => sub {
+      die "Length expects a single argument" unless @_ eq 1;
+      my $array = shift;
+      return {
+        type => 'num',
+        value => scalar @{$array->{exprs}}
+      }
+    },
+  },
+
   'say' => {
     type => 'primitive_fn',
     value => sub {

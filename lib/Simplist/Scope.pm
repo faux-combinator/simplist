@@ -28,7 +28,12 @@ sub export {
 }
 
 sub set {
-  die 'NYI set (traverses parent)';
+  my ($scope, $name, $value) = @_;
+  if ($scope->{type} eq 'root') {
+    $scope->assign($name, $value);
+  } else {
+    die 'NYI set (traverses parent)';
+  }
 }
 
 sub resolve {

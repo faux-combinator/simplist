@@ -11,8 +11,7 @@ use Data::Dump qw(pp);
 
 @EXPORT_OK = qw(evaluate);
 
-# TODO let should just be a macro that uses lambda underneath...
-my @specials = qw(let lambda eval macro export import);
+my @specials = qw(let lambda eval macro export import def);
 
 sub evaluate_node {
   my ($runtime, $scope, $node) = @_;
@@ -30,12 +29,25 @@ sub is_special_call {
   $fn->{type} eq "id" && any { $_ eq $fn->{value} } @specials;
 }
 
+# (def NAME EXPR)
+# TODO forbid (def NAME (def NAME ...))
+sub run_def {
+  my ($runtime, $scope, $node) = @_;
+  die "Define is only available at the top-level" if $scope->{parent};
+  die "Define needs a name and a value" unless @{$node->{exprs}} == 3;
+  my ($_kw, $name, $value) = @{$node->{exprs}};
+  die "Define name should be a static identifier" unless $name->{type} eq 'id';
+  my $result = evaluate_node($runtime, $scope, $value);
+  $scope->assign($name->{value}, $result);
+  $result
+}
+
 # (export NAME EXPR)
 sub run_export {
   my ($runtime, $scope, $node) = @_;
   die "Export is only available at the top-level" if $scope->{parent};
-  die "Export needs a name and a value" unless @{$node->{exprs}} == 2;
-  my ($name, $value) = @{$node->{exprs}};
+  die "Export needs a name and a value" unless @{$node->{exprs}} == 3;
+  my ($_kw, $name, $value) = @{$node->{exprs}};
   die "Exported name should be a static identifier" unless $name->{type} eq 'id';
   my $result = evaluate_node($runtime, $scope, $value);
   $scope->export($name->{value}, $result);
@@ -53,8 +65,8 @@ sub _import_load {
 sub run_import {
   my ($runtime, $scope, $node) = @_;
   die "NYI import-as" if @{$node->{exprs}} == 1;
-  die "Malformed import statement" unless @{$node->{exprs}} == 2;
-  my ($pkg, $names) = @{$node->{exprs}};
+  die "Malformed import statement" unless @{$node->{exprs}} == 3;
+  my ($_kw, $pkg, $names) = @{$node->{exprs}};
   die "Exported name should be a static identifier" unless $pkg->{type} eq 'id';
   my $package = $pkg->{value};
   die "Import list should be a list" unless $names->{type} eq 'list';
@@ -80,7 +92,8 @@ sub run_import {
 sub run_list {
   my ($runtime, $scope, $node) = @_;
   die "invalid call: empty call" unless @{$node->{exprs}};
-  my $fn = shift @{$node->{exprs}};
+  my @exprs = @{$node->{exprs}};
+  my $fn = shift @exprs;
   if (is_special_call($fn)) {
     my $method = "run_$fn->{value}";
     return $runtime->$method($scope, $node);
@@ -88,9 +101,9 @@ sub run_list {
 
   $fn = evaluate_node($runtime, $scope, $fn);
   if ($fn->{macro}) {
-    return $runtime->run_macro_call($scope, $fn, $node->{exprs});
+    return $runtime->run_macro_call($scope, $fn, \@exprs);
   }
-  my @values = evaluate_nodes($runtime, $scope, $node->{exprs});
+  my @values = evaluate_nodes($runtime, $scope, \@exprs);
   die "not callable: $fn->{type}" unless $fn->{type} =~ /fn$/;
 
   if ($fn->{type} eq 'primitive_fn') {
@@ -132,7 +145,7 @@ sub run_macro_call {
 # (let NAME VALUE EXPR)
 sub run_let {
   my ($runtime, $scope, $node) = @_;
-  my ($name, $value, $expr) = @{$node->{exprs}};
+  my ($_kw, $name, $value, $expr) = @{$node->{exprs}};
   die "cannot let a non-id" unless $name->{type} eq "id";
   my $new_scope = $scope->child('let');
   $new_scope->assign($name->{value}, evaluate_node($runtime, $scope, $value));
@@ -143,6 +156,7 @@ sub run_let {
 sub run_eval {
   my ($runtime, $scope, $node) = @_;
   my @exprs = @{$node->{exprs}};
+  shift @exprs; # Remove `eval`
   die "eval can only eval one thing" if @exprs != 1;
   
   my ($expr) = @exprs;
@@ -155,6 +169,7 @@ sub run_lambda {
   my ($runtime, $scope, $node) = @_;
   # extract scope, parameters and body
   my @parts = @{$node->{exprs}};
+  shift @parts; # remove `lambda`
   die 'invalid syntax to lambda' if scalar @parts < 2;
 
   # the first () is the params, the 2nd is the body

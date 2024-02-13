@@ -10,8 +10,8 @@ my @rules = (
   [ qr/\(/, 'lparen' ],
   [ qr/\)/, 'rparen' ],
   [ qr/'/, 'quote' ],
-  [ qr/\d+/, 'num' ],
-  [ qr{[a-z+*/-][a-z0-9+*/-]*}, 'id' ],
+  [ qr/[+-]?\d+/, 'num' ],
+  [ qr{[a-z+*/<>-][a-z0-9+*/<>-]*}, 'id' ],
 );
 
 sub lex {
