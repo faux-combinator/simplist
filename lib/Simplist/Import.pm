@@ -26,6 +26,22 @@ my $stdlib = {
         exprs => \@_
       };
     },
+  },
+  'say' => {
+    type => 'primitive_fn',
+    value => sub {
+      for my $el (@_) {
+        if ($el->{type} eq 'num') {
+          say $el->{value};
+        } else {
+          die "NYI say for $el->{type}";
+        }
+      }
+      return {
+        type => 'list',
+        exprs => []
+      };
+    },
   }
 };
 

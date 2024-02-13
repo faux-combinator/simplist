@@ -6,6 +6,7 @@ use Simplist::Lexer qw(lex);
 use Simplist::Parser qw(parse);
 use Simplist::Eval qw(evaluate);
 #BEGIN { plan tests => 8; }
+my $lib_path = 't/lib/';
 
 sub check {
   my $code = shift;
@@ -275,7 +276,7 @@ like(exception { run('(import x ())') },
   "requires SIMPLIST_PATH to load");
 
 {
-  local $ENV{SIMPLIST_PATH} = 't/lib/';
+  local $ENV{SIMPLIST_PATH} = $lib_path;
   is_deeply run("
 (import mylib (a b add3))
 (import std (+))
@@ -285,6 +286,27 @@ like(exception { run('(import x ())') },
   like(exception { run('(import mylib (a b)) (+ a b)') },
     qr/no such identifier: \+/,
     "Import doesn't pollute the current scope");
+}
+
+{
+  use Capture::Tiny ':all';
+  my $stdout = capture_stdout(sub {
+    is_deeply run("(import std (say)) (say 1 2 3)"),
+      {type => 'list', exprs => []},
+      "Say returns an empty list";
+  });
+  is $stdout, "1\n2\n3\n", "`say` works";
+}
+
+{
+  use Capture::Tiny ':all';
+  local $ENV{SIMPLIST_PATH} = $lib_path;
+  my $stdout = capture_stdout(sub {
+    is_deeply run("(import printmod (a)) (import printmod (a)) (import printmod (a))"),
+      {type => 'list', exprs => []},
+      "Say returns an empty list";
+  });
+  is $stdout, "123\n", "module only loads once";
 }
 
 done_testing;

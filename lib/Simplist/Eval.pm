@@ -54,21 +54,23 @@ sub run_import {
   my ($runtime, $scope, $node) = @_;
   die "NYI import-as" if @{$node->{exprs}} == 1;
   die "Malformed import statement" unless @{$node->{exprs}} == 2;
-  my ($package, $names) = @{$node->{exprs}};
-  die "Exported name should be a static identifier" unless $package->{type} eq 'id';
+  my ($pkg, $names) = @{$node->{exprs}};
+  die "Exported name should be a static identifier" unless $pkg->{type} eq 'id';
+  my $package = $pkg->{value};
   die "Import list should be a list" unless $names->{type} eq 'list';
 
-  # TODO reuse imports, store them in $runtime->, reuse runtime
-  my $import = resolve_import($package->{value}, \&_import_load);
+  # Store imports in `modules` so we don't run their side-effects twice
+  my $import = $runtime->{modules}{$package} //= resolve_import($package, \&_import_load);
 
-  die "Cannot resolve module $package->{value}" unless $import;
+  die "Cannot resolve module $package" unless $import;
   for my $name (@{$names->{exprs}}) {
     die "Import name should be an identifier" unless $name->{type} eq 'id';
-    die "Package $package->{value} has no $name->{value}" unless exists $import->{$name->{value}};
+    die "Package $package has no $name->{value}" unless exists $import->{$name->{value}};
     $scope->assign($name->{value}, $import->{$name->{value}});
   }
 
-  undef # TODO return the object/import-as
+  # TODO return the object/import-as
+  {type => 'list', exprs => []}
 }
 
 # (CALLABLE PARAM...)
@@ -206,7 +208,7 @@ sub run_id {
 
 sub evaluate {
   my ($nodes) = @_;
-  my $runtime = bless {};
+  my $runtime = bless {modules => {}};
   my $scope = root_scope;
   my @results = evaluate_nodes($runtime, $scope, $nodes);
   # only return the last result
