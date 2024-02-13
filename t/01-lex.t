@@ -1,7 +1,7 @@
 use Modern::Perl;
 use Test::More;
 use Simplist::Lexer qw(lex);
-BEGIN { plan tests => 10; }
+BEGIN { plan tests => 11; }
 
 is_deeply [lex('')], [], "Empty parse";
 is_deeply [lex('(')], [{type => 'lparen', value => '('}], "Left parenthesis";
@@ -15,6 +15,7 @@ is_deeply [lex("v/e+r-ycomplex*identifierz*")], [{type => 'id', value => 'v/e+r-
 
 is_deeply [lex("1")], [{type => 'num', value => 1}], "Num #1";
 is_deeply [lex("123")], [{type => 'num', value => 123}], "Num #2";
+is_deeply [lex("1 2 3")], [{type => 'num', value => 1}, {type => 'num', value => 2}, {type => 'num', value => 3}], "Multinum";
 
 is_deeply [lex("(add-+ 1 '(2))")], [
   {type => 'lparen', value => '('},

@@ -7,12 +7,20 @@ use Simplist::Parser qw(parse);
 use Simplist::Eval qw(evaluate);
 #BEGIN { plan tests => 8; }
 
-sub run {
+sub check {
   my $code = shift;
   $code =~ s/\n//g; # lol newlines not handled
   my @tokens = lex($code);
   my $parsetree = parse(\@tokens);
-  evaluate($parsetree);
+  evaluate($parsetree)
+}
+
+sub run {
+  check(shift)->{value};
+}
+
+sub exported {
+  check(shift)->{export};
 }
 
 is_deeply run('1'), {type => 'num', value => 1},
@@ -201,9 +209,38 @@ is_deeply run("
     (list 'macro (list) (list '+ 3 4)))
   ((outer)))
 "), {type => 'num', value => 7},
-"macros can be returned from macros";
+  "macros can be returned from macros";
+
+is_deeply run("1 2 3"), {type => 'num', value => 3},
+  "can have multiple statements";
 
 like(exception { run('()'); }, qr/invalid call/,
   "Empty calls are invalid");
+
+is_deeply check("(export a 1)"), {
+  value => {type => 'num', value => 1},
+  export => {a => {type => 'num', value => 1}}
+}, "export returns its value";
+
+is_deeply check("(export a 1) (export b (+ a 1)) (+ a b)"), {
+  value => {type => 'num', value => 3},
+  export => {
+    a => {type => 'num', value => 1},
+    b => {type => 'num', value => 2}
+  }
+}, "export also exposes the names";
+
+like(exception { run('((lambda () (export a 1)))') }, qr/top-level/,
+  "Cannot have an export inside ane expr");
+
+#is_deeply check("(let start 1 (export a start) (export b start))"), {
+#  value => {type => 'num', value => 1},
+#  export => {
+#    a => {type => 'num', value => 1},
+#    b => {type => 'num', value => 1}
+#  }
+#}, "export available in let";
+
+# TODO import
 
 done_testing;

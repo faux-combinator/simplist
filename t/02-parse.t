@@ -2,7 +2,7 @@ use Modern::Perl;
 use Test::More;
 use Test::Fatal;
 use Simplist::Parser qw(parse);
-BEGIN { plan tests => 13; }
+BEGIN { plan tests => 14; }
 
 my $lparen = {type => 'lparen', value => '('};
 my $rparen = {type => 'rparen', value => ')'};
@@ -45,6 +45,12 @@ is_deeply parse([$quote, $lparen, $num, $id, $num, $rparen]), [
       exprs => [$num, $id, $num],
     } },
 ], "Multi value list";
+
+is_deeply parse([$num, $num, $num]), [
+  { type => 'num', value => 1 },
+  { type => 'num', value => 1 },
+  { type => 'num', value => 1 }
+], "Multi expressions";
 
 like(exception { is_deeply parse([]), []; }, qr/one_of/,
   "fails to parse the one_of");

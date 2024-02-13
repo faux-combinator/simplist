@@ -9,7 +9,7 @@ use vars qw(@EXPORT_OK);
 @EXPORT_OK = qw(evaluate);
 
 # TODO let should just be a macro that uses lambda underneath...
-my @specials = qw(let lambda eval macro);
+my @specials = qw(let lambda eval macro export);
 
 sub evaluate_node {
   my ($runtime, $scope, $node) = @_;
@@ -25,6 +25,18 @@ sub evaluate_nodes {
 sub is_special_call {
   my $fn = shift;
   $fn->{type} eq "id" && any { $_ eq $fn->{value} } @specials;
+}
+
+sub run_export {
+  my ($runtime, $scope, $node) = @_;
+  die "Export is only available at the top-level" if $scope->{parent};
+  die "Export needs a name and a value" unless @{$node->{exprs}} == 2;
+  my ($name, $value) = @{$node->{exprs}};
+  die "Exported name should be a static identifier" unless $name->{type} eq 'id';
+  my $result = evaluate_node($runtime, $scope, $value);
+  $runtime->{export}{$name->{value}} = $result;
+  $scope->assign($name->{value}, $result);
+  $result # If it's the last statement
 }
 
 # (CALLABLE PARAM...)
@@ -161,11 +173,11 @@ sub run_id {
 }
 
 sub evaluate {
-  my $runtime = bless {nodes => shift};
+  my $runtime = bless {nodes => shift, export => {}};
   my $scope = root_scope;
   my @results = evaluate_nodes($runtime, $scope, $runtime->{nodes});
   # only return the last result
-  $results[-1];
+  return { value => $results[-1], export => $runtime->{export} };
 }
 
 1;
