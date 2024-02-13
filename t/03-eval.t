@@ -48,6 +48,14 @@ is_deeply run('((lambda (x) (+ 1 x)) 4)'), {type => 'num', value => 5},
   "Lambda as value";
 
 is_deeply run('
+((lambda ()
+  1
+  2
+  3))
+'), {type => 'num', value => 3},
+  "Multiple exprs in let body";
+
+is_deeply run('
 ((let val 3
   (lambda (x) (+ val x)))
   4)

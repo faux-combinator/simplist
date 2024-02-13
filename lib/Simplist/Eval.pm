@@ -27,6 +27,7 @@ sub is_special_call {
   $fn->{type} eq "id" && any { $_ eq $fn->{value} } @specials;
 }
 
+# (export NAME EXPR)
 sub run_export {
   my ($runtime, $scope, $node) = @_;
   die "Export is only available at the top-level" if $scope->{parent};
@@ -85,7 +86,8 @@ sub run_lambda_call {
     $new_scope->assign($name, shift @values);
   }
 
-  evaluate_node($runtime, $new_scope, $fn->{body});
+  my @results = evaluate_nodes($runtime, $new_scope, $fn->{body});
+  $results[-1]
 }
 
 sub run_macro_call {
@@ -120,10 +122,10 @@ sub run_lambda {
   my ($runtime, $scope, $node) = @_;
   # extract scope, parameters and body
   my @parts = @{$node->{exprs}};
-  die 'invalid syntax to lambda' if scalar @parts != 2;
+  die 'invalid syntax to lambda' if scalar @parts < 2;
 
   # the first () is the params, the 2nd is the body
-  my ($params, $body) = @parts;
+  my ($params, @body) = @parts;
 
   my @params = @{$params->{exprs}};
   die 'parameters must be identifiers' if any { $_->{type} ne 'id' } @params;
@@ -132,9 +134,8 @@ sub run_lambda {
 
   # store the scope (lexical scoping ftw!)
   $node->{scope} = $scope;
-  # we don't allow variadic lambdas (only one expression).
   undef $node->{exprs};
-  $node->{body} = $body;
+  $node->{body} = [@body];
   $node->{type} = 'fn';
   $node;
 }
