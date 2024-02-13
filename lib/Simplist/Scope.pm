@@ -3,33 +3,11 @@ use Modern::Perl;
 use Exporter qw(import);
 use vars qw(@EXPORT_OK);
 use Data::Dump qw(pp);
-use List::Util qw(sum0 product all);
 
 @EXPORT_OK = qw(root_scope);
 
 sub root_scope {
-  my $scope = bless {};
-  $scope->{names}{'+'} = {
-    type => 'primitive_fn',
-    value => sub {
-      die unless all { $_->{type} eq 'num'; } @_;
-      return {
-        type => 'num',
-        value => sum0(map { $_->{value} } @_)
-      };
-    },
-  };
-  $scope->{names}{'list'} = {
-    type => 'primitive_fn',
-    value => sub {
-      return {
-        type => 'list',
-        exprs => \@_
-      };
-    },
-  };
-
-  $scope
+  bless {}
 };
 
 sub child {

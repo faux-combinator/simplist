@@ -1,15 +1,16 @@
 package Simplist::Eval;
 use Modern::Perl;
 use Exporter qw(import);
+use vars qw(@EXPORT_OK);
 use Simplist::Scope qw(root_scope);
+use Simplist::Import qw(resolve_import);
 use List::Util qw(any);
 use Data::Dump qw(pp);
-use vars qw(@EXPORT_OK);
 
 @EXPORT_OK = qw(evaluate);
 
 # TODO let should just be a macro that uses lambda underneath...
-my @specials = qw(let lambda eval macro export);
+my @specials = qw(let lambda eval macro export import);
 
 sub evaluate_node {
   my ($runtime, $scope, $node) = @_;
@@ -38,6 +39,26 @@ sub run_export {
   $runtime->{export}{$name->{value}} = $result;
   $scope->assign($name->{value}, $result);
   $result # If it's the last statement
+}
+
+# (import LIBNAME (NAME...))
+sub run_import {
+  my ($runtime, $scope, $node) = @_;
+  die "NYI import-as" if @{$node->{exprs}} == 1;
+  die "Malformed import statement" unless @{$node->{exprs}} == 2;
+  my ($package, $names) = @{$node->{exprs}};
+  die "Exported name should be a static identifier" unless $package->{type} eq 'id';
+  die "Import list should be a list" unless $names->{type} eq 'list';
+
+  my $import = resolve_import($package->{value});
+  die "Cannot resolve module $package->{value}" unless $import;
+  for my $name (@{$names->{exprs}}) {
+    die "Import name should be an identifier" unless $name->{type} eq 'id';
+    die "Package $package->{value} has no $name" unless exists $import->{$name->{value}};
+    $scope->assign($name->{value}, $import->{$name->{value}});
+  }
+
+  undef # TODO return the object/import-as
 }
 
 # (CALLABLE PARAM...)

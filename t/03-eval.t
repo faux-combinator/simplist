@@ -25,11 +25,11 @@ sub exported {
 
 is_deeply run('1'), {type => 'num', value => 1},
   "Basic test";
-is_deeply run('(+)'), {type => 'num', value => 0},
+is_deeply run('(import std (+)) (+)'), {type => 'num', value => 0},
   "Empty call";
-is_deeply run('(+ 1)'), {type => 'num', value => 1},
+is_deeply run('(import std (+)) (+ 1)'), {type => 'num', value => 1},
   "One-value call";
-is_deeply run('(+ 1 2 3)'), {type => 'num', value => 6},
+is_deeply run('(import std (+)) (+ 1 2 3)'), {type => 'num', value => 6},
   "Multi-values call";
 
 # TODO ensure let allows to redefine primitives
@@ -39,12 +39,12 @@ is_deeply run('(let a 3 (let b 4 a))'), {type => 'num', value => 3},
   "Let over Let";
 is_deeply run('(let a 3 (let a 4 a))'), {type => 'num', value => 4},
   "Let over Let (same name)";
-is_deeply run('(let a 3 (let b 4 (+ a b)))'), {type => 'num', value => 7},
+is_deeply run('(import std (+)) (let a 3 (let b 4 (+ a b)))'), {type => 'num', value => 7},
   "Let over Let, with body";
 
 is_deeply run('(let id (lambda (x) x) (id 4))'), {type => 'num', value => 4},
   "Lambda in Let";
-is_deeply run('((lambda (x) (+ 1 x)) 4)'), {type => 'num', value => 5},
+is_deeply run('((lambda (x) (import std (+)) (+ 1 x)) 4)'), {type => 'num', value => 5},
   "Lambda as value";
 
 is_deeply run('
@@ -56,6 +56,7 @@ is_deeply run('
   "Multiple exprs in let body";
 
 is_deeply run('
+(import std (+))
 ((let val 3
   (lambda (x) (+ val x)))
   4)
@@ -65,7 +66,9 @@ is_deeply run('
 is_deeply run('
 ((let val 10
   (let val 3
-    (lambda (x) (+ val x))))
+    (lambda (x)
+      (import std (+))
+      (+ val x))))
   4)
 '), {type => 'num', value => 7},
   "Let over lambda";
@@ -86,14 +89,14 @@ is_deeply run('
 is_deeply run('((lambda (x) (let x 3 x)) 7)'), {type => 'num', value => 3},
   "Let over lambda - let in lambda take over let params";
 
-is_deeply run('(list 1 2)'), {
+is_deeply run('(import std (list)) (list 1 2)'), {
   type => 'list',
   exprs => [
     {type => 'num', value => 1},
     {type => 'num', value => 2},
   ]}, "A list";
 
-is_deeply run('(list 4 (+ 1 2))'), {
+is_deeply run('(import std (+ list)) (list 4 (+ 1 2))'), {
   type => 'list',
   exprs => [
     {type => 'num', value => 4},
@@ -111,41 +114,39 @@ is_deeply run('(list 4 (+ 1 2))'), {
               {type => 'num', value => 3},
   ]}]}]};
 
-  is_deeply run('(list 1 (list 2 (list 3)))'), $deep_list, "A list";
+  is_deeply run('(import std (list)) (list 1 (list 2 (list 3)))'), $deep_list, "A list";
   is_deeply run("'(1 (2 (3)))"), $deep_list, "A list";
 }
 
 # TODO test empty lists
 {
-  my $result = run('(list + 2 (+ 2 1))');
-  # remove the "CODE" part of the sub
-  undef $result->{exprs}[0]->{value};
-  is_deeply $result, {type => 'list', exprs => [
-      {type => 'primitive_fn', value => undef},
-      {type => 'num', value => 2},
-      {type => 'num', value => 3},
-    ]}, "Lists";
+  my $result = run('(import std (list +)) (list + 2 (+ 2 1))');
+  is $result->{type}, 'list', "It's a list";
+  is scalar @{$result->{exprs}}, 3, "with 3 parts";
+  is $result->{exprs}[0]{type}, 'primitive_fn', "first is a primitive_fn";
+  is_deeply $result->{exprs}[1], {type => 'num', value => 2}, "second is 2";
+  is_deeply $result->{exprs}[2], {type => 'num', value => 3}, "third is 3";
 }
 
-is_deeply run('(eval (list + 1 2))'), {type => 'num', value => 3},
+is_deeply run('(import std (list +)) (eval \'(+ 1 2))'), {type => 'num', value => 3},
   "Eval works";
 
-is_deeply run("((eval '+))"), {type => 'num', value => 0},
+is_deeply run("(import std (+)) ((eval '+))"), {type => 'num', value => 0},
   "Eval resolves quoted stuff";
 
-is_deeply run("(eval (eval (eval +)))")->{type}, "primitive_fn",
+is_deeply run("(import std (+)) (eval (eval (eval +)))")->{type}, "primitive_fn",
   "A primitive function evaluates to itself";
 
 is_deeply run("(eval (eval (eval (lambda () 1))))")->{type}, "fn",
   "A primite function evaluates to itself";
 
-is_deeply run("((eval (eval ''+)))"), {type => 'num', value => 0},
+is_deeply run("(import std (+)) ((eval (eval ''+)))"), {type => 'num', value => 0},
   "Eval resolves quoted stuff... twice";
 
-is_deeply run("(eval '(+ 1 (+ 2 3)))"), {type => 'num', value => 6},
+is_deeply run("(import std (+)) (eval '(+ 1 (+ 2 3)))"), {type => 'num', value => 6},
   "Eval works at every level";
 
-is_deeply run("(eval '(list 1 '(+ 1 2)))"), {
+is_deeply run("(import std (list +)) (eval '(list 1 '(+ 1 2)))"), {
   type => 'list', exprs => [
     {type => 'num', value => 1},
     {type => 'list', exprs => [
@@ -158,6 +159,7 @@ is_deeply run("''+"), {type => 'quote', expr => {type => 'id', value => '+'}},
   "Quote will wrap and wrap";
 
 is_deeply run("
+(import std (+))
 ((let fn
   (let + (lambda () 15) '+)
   (eval fn))
@@ -166,7 +168,7 @@ is_deeply run("
   "Quoting an identifier delays its resolution";
 
 is_deeply run("
-(let fn (lambda (id x y) (+ y (eval id)))
+(let fn (lambda (id x y) (import std (+)) (+ y (eval id)))
   (let x 10
     (fn 'x 5 x)))
 "), {type => 'num', value => 15},
@@ -180,15 +182,19 @@ is_deeply run("
   "MACROS (macro's return value is evaluated in the calling scope)";
 
 is_deeply run("
+(import std (+))
 (let mylet (macro (name value body)
+              (import std (list))
               (list (list 'lambda (list name) body) value))
   (mylet a 5 (+ 3 a)))
 "), {type => 'num', value => 8},
   "Macros can be used to reimplement let";
 
 is_deeply run("
+(import std (+))
 (let m (let name 'id
           (macro (value body)
+            (import std (list))
             (list 'let name value body)))
   (m 3 (+ id id)))
 "), {type => 'num', value => 6},
@@ -212,6 +218,7 @@ is_deeply run("
   "macros respect both scopes at the same time";
 
 is_deeply run("
+(import std (+ list))
 (let outer
   (macro ()
     (list 'macro (list) (list '+ 3 4)))
@@ -230,7 +237,7 @@ is_deeply check("(export a 1)"), {
   export => {a => {type => 'num', value => 1}}
 }, "export returns its value";
 
-is_deeply check("(export a 1) (export b (+ a 1)) (+ a b)"), {
+is_deeply check("(import std (+)) (export a 1) (export b (+ a 1)) (+ a b)"), {
   value => {type => 'num', value => 3},
   export => {
     a => {type => 'num', value => 1},
@@ -249,6 +256,15 @@ like(exception { run('((lambda () (export a 1)))') }, qr/top-level/,
 #  }
 #}, "export available in let";
 
-# TODO import
+like(exception { run('(let x ((lambda () (import std (+)) (+ 1 2))) (+ x x))') },
+  qr/no such identifier: \+/,
+  "imports are local");
+
+like(exception { run('(let m (macro () (import std (list)) \'(list 1 2)) (m))') },
+  qr/no such identifier: list/,
+  "imports don't cross macro phases");
+
+# XXX import-as
+# XXX import file
 
 done_testing;
