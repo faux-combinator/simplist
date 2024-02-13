@@ -264,7 +264,21 @@ like(exception { run('(let m (macro () (import std (list)) \'(list 1 2)) (m))') 
   qr/no such identifier: list/,
   "imports don't cross macro phases");
 
+# XXX invalid import variable
+# XXX importing doesn't pollute the current scope
 # XXX import-as
-# XXX import file
+
+like(exception { run('(import x ())') },
+  qr/Cannot import without a defined SIMPLIST_PATH/,
+  "requires SIMPLIST_PATH to load");
+
+{
+  local $ENV{SIMPLIST_PATH} = 't/lib/';
+  is_deeply run("
+(import mylib (a b add3))
+(import std (+))
+(add3 (+ a b))
+"), { type => 'num', value => 6 }, "Can import a library!";
+}
 
 done_testing;

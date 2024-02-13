@@ -1,0 +1,7 @@
+(export a 1)
+(export b 2)
+(export add3
+  (let value 3
+    (lambda (x)
+      (import std (+))
+      (+ x 3))))

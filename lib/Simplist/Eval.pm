@@ -2,6 +2,8 @@ package Simplist::Eval;
 use Modern::Perl;
 use Exporter qw(import);
 use vars qw(@EXPORT_OK);
+use Simplist::Lexer qw(lex);
+use Simplist::Parser qw(parse);
 use Simplist::Scope qw(root_scope);
 use Simplist::Import qw(resolve_import);
 use List::Util qw(any);
@@ -41,6 +43,13 @@ sub run_export {
   $result # If it's the last statement
 }
 
+# helper used by importer to avoid cycle imports
+sub _import_load {
+  my @tokens = lex(shift);
+  my $tree = parse(\@tokens);
+  evaluate($tree)->{export}
+}
+
 # (import LIBNAME (NAME...))
 sub run_import {
   my ($runtime, $scope, $node) = @_;
@@ -50,11 +59,13 @@ sub run_import {
   die "Exported name should be a static identifier" unless $package->{type} eq 'id';
   die "Import list should be a list" unless $names->{type} eq 'list';
 
-  my $import = resolve_import($package->{value});
+  # TODO reuse imports, store them in $runtime->, reuse runtime
+  my $import = resolve_import($package->{value}, \&_import_load);
+
   die "Cannot resolve module $package->{value}" unless $import;
   for my $name (@{$names->{exprs}}) {
     die "Import name should be an identifier" unless $name->{type} eq 'id';
-    die "Package $package->{value} has no $name" unless exists $import->{$name->{value}};
+    die "Package $package->{value} has no $name->{value}" unless exists $import->{$name->{value}};
     $scope->assign($name->{value}, $import->{$name->{value}});
   }
 
@@ -195,9 +206,10 @@ sub run_id {
 }
 
 sub evaluate {
-  my $runtime = bless {nodes => shift, export => {}};
+  my ($nodes) = @_;
+  my $runtime = bless {export => {}};
   my $scope = root_scope;
-  my @results = evaluate_nodes($runtime, $scope, $runtime->{nodes});
+  my @results = evaluate_nodes($runtime, $scope, $nodes);
   # only return the last result
   return { value => $results[-1], export => $runtime->{export} };
 }
