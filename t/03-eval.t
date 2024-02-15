@@ -321,6 +321,11 @@ like(exception { run('(import x ())') },
   is $stdout, "123\n", "module only loads once";
 }
 
-# TODO test imported macro
+{
+  local $ENV{SIMPLIST_PATH} = $lib_path;
+  is_deeply run("(import with (with-it)) (with-it 5 it)"),
+    {type => 'num', value => 5},
+    "Import macro";
+}
 
 done_testing;
