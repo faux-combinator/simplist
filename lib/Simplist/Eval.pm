@@ -221,6 +221,41 @@ sub run_id {
   $scope->resolve($node->{value});
 }
 
+sub quasiquote {
+  my ($runtime, $scope, $expr) = @_;
+  if ($expr->{type} eq 'unquote_splicing') {
+    die 'unquote-splicing outside of a list quasiquote';
+  } elsif ($expr->{type} eq 'unquote') {
+    evaluate_node($runtime, $scope, $expr->{expr});
+  } elsif ($expr->{type} eq 'list') {
+    my @mapped = map {
+      if ($_->{type} eq 'unquote_splicing') {
+        my $result = evaluate_node($runtime, $scope, $_->{expr});
+        # Our model is a bit convoluted, so we need this...
+        die 'Unquote-splicing didn\'t result in a list' unless $result->{type} eq 'list';
+        @{$result->{exprs}}
+      } else {
+        quasiquote($runtime, $scope, $_)
+      }
+    } @{$expr->{exprs}};
+    {type => 'list', exprs => [@mapped]}
+  } else {
+    $expr
+  }
+}
+sub run_quasiquote {
+  my ($runtime, $scope, $node) = @_;
+  quasiquote($runtime, $scope, $node->{expr});
+}
+
+sub run_unquote {
+  die 'unquote outside of a quasiquote';
+}
+
+sub run_unquote_splicing {
+  die 'unquote-splicing outside of a quasiquote';
+}
+
 sub evaluate {
   my ($nodes) = @_;
   my $runtime = bless {modules => {}};
