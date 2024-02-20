@@ -10,6 +10,9 @@ my @rules = (
   [ qr/\(/, 'lparen' ],
   [ qr/\)/, 'rparen' ],
   [ qr/'/, 'quote' ],
+  [ qr/`/, 'quasiquote' ],
+  [ qr/,@/, 'unquote_splicing' ],
+  [ qr/,/, 'unquote' ],
   [ qr/[+-]?\d+/, 'num' ],
   [ qr{[a-z+*/<>-][a-z0-9+*/<>-]*}, 'id' ],
 );

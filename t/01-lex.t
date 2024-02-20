@@ -1,7 +1,7 @@
 use Modern::Perl;
 use Test::More;
 use Simplist::Lexer qw(lex);
-BEGIN { plan tests => 11; }
+BEGIN { plan tests => 12; }
 
 is_deeply [lex('')], [], "Empty parse";
 is_deeply [lex('(')], [{type => 'lparen', value => '('}], "Left parenthesis";
@@ -27,3 +27,19 @@ is_deeply [lex("(add-+ 1 '(2))")], [
   {type => 'rparen', value => ')'},
   {type => 'rparen', value => ')'},
 ], "Num #1";
+
+is_deeply [lex("(list `1 `,1 `,@(list))")], [
+  {type => 'lparen', value => '('},
+  {type => 'id', value => 'list'},
+  {type => 'quasiquote', value => '`'},
+  {type => 'num', value => '1'},
+  {type => 'quasiquote', value => '`'},
+  {type => 'unquote', value => ','},
+  {type => 'num', value => '1'},
+  {type => 'quasiquote', value => '`'},
+  {type => 'unquote_splicing', value => ',@'},
+  {type => 'lparen', value => '('},
+  {type => 'id', value => 'list'},
+  {type => 'rparen', value => ')'},
+  {type => 'rparen', value => ')'},
+], "Unquote and stuff";

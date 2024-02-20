@@ -96,7 +96,7 @@ use Data::Dump qw(pp);
  
   die "Cannot import without a defined SIMPLIST_PATH" unless exists $ENV{SIMPLIST_PATH};
   my $fullpath = "$ENV{SIMPLIST_PATH}/$package.simpl";
-  die "NYI module loading" unless -f $fullpath;
+  die "File not found: $fullpath" unless -f $fullpath;
   my $content = read_file $fullpath;
   $loader->($content);
 }
