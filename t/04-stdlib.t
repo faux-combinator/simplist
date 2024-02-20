@@ -8,7 +8,6 @@ use Data::Dump qw(pp);
 
 sub check {
   my $code = shift;
-  $code =~ s/\n//g; # lol newlines not handled
   my @tokens = lex($code);
   my $parsetree = parse(\@tokens);
   evaluate($parsetree)
