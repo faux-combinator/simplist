@@ -27,12 +27,22 @@ sub call {
   {type => 'list', exprs => $exprs}
 }
 
+sub quote_unquote_token {
+  my $parser = shift;
+  $parser->one_of(
+    sub { $parser->expect('quote') },
+    sub { $parser->expect('quasiquote') },
+    sub { $parser->expect('unquote') },
+    sub { $parser->expect('unquote_splicing') },
+  );
+}
+
 sub quote {
   my $parser = shift;
-  $parser->expect('quote');
+  my $quote = $parser->match(\&quote_unquote_token);
   my $expr = $parser->match(\&expr);
 
-  {type => 'quote', expr => $expr}
+  {type => $quote->{type}, expr => $expr}
 }
 
 sub expr {
