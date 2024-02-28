@@ -240,16 +240,20 @@ sub quasiquote {
           die 'Unquote-splicing didn\'t result in a list' unless $result->{type} eq 'list';
           @{$result->{exprs}}
         } else {
-          die "NYI broken";
-          quasiquote($runtime, $scope, $depth - 1, $_->{expr});
+          # XXX this should "distribute" over the multiple elements, not sure here or not...
+          #     this impl might work, it might not
+          die "NYI nested unquote_splicing";
+          {type => 'unquote_splicing', expr => quasiquote($runtime, $scope, $depth - 1, $_->{expr})};
         }
       } else {
         quasiquote($runtime, $scope, $depth, $_)
       }
     } @{$expr->{exprs}};
     {type => 'list', exprs => [@mapped]}
-  } elsif ($expr->{type} eq 'quote' || $expr->{type} eq 'quasiquote') {
-    {type => $expr->{type}, expr => quasiquote($runtime, $scope, $depth + 1, $expr->{expr})};
+  } elsif ($expr->{type} eq 'quote') {
+    {type => 'quote', expr => quasiquote($runtime, $scope, $depth, $expr->{expr})};
+  } elsif ($expr->{type} eq 'quasiquote') {
+    {type => 'quasiquote', expr => quasiquote($runtime, $scope, $depth + 1, $expr->{expr})};
   } else {
     $expr
   }

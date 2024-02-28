@@ -104,12 +104,25 @@ is_deeply run('
 is_deeply run('
 (import std (say))
 (def define-alias
+  (macro (as aliased)
+    `(def ,as
+      (macro (name)
+        `(def ,name ,`,aliased)))))
+(def x 1)
+(define-alias defx x)
+(defx a)
+a
+'), { type => 'num', value => 1 },
+  'nested quote-unquote';
+
+is_deeply run('
+(import std (say))
+(def define-alias
   (macro (as x)
     `(def ,as
       (macro (name)
-        `(def ,name ,`,x)))))
-(def x 1)
-(define-alias defx x)
+        `(def ,name ,\',x)))))
+(define-alias defx 1)
 (defx a)
 a
 '), { type => 'num', value => 1 },
