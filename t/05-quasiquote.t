@@ -107,7 +107,7 @@ is_deeply run('
   (macro (as aliased)
     `(def ,as
       (macro (name)
-        `(def ,name ,`,aliased)))))
+        `(def ,name ,\',aliased)))))
 (def x 1)
 (define-alias defx x)
 (defx a)
@@ -127,6 +127,32 @@ is_deeply run('
 a
 '), { type => 'num', value => 1 },
   'nested quote-unquote';
+
+is_deeply run('
+(import std (say))
+(def define-alias
+  (macro (as x)
+    `(def ,as
+      (macro (name)
+        `(def ,name ,\',x)))))
+(def foo 1)
+(define-alias defx foo)
+(defx a)
+a
+'), { type => 'num', value => 1 },
+  'nested quote-unquote and an id';
+
+  #is_deeply run('
+  #(import std (+))
+  #(def define-op
+  #  (macro (name xs)
+  #    `(def ,name
+  #      (macro (op)
+  #        `(,op ,\',@xs)))))
+  #(define-op of123 (1 2 3))
+  #(of123 +)
+  #'), { type => 'num', value => 6 },
+  #  'nested quote-splicing_unquote';
 
 like(exception { run('`,@1'); }, qr/unquote-splicing outside of a list quasiquote/,
   "Cannot bare unquote-splicing");
