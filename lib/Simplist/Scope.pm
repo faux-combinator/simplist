@@ -43,4 +43,11 @@ sub resolve {
   die "no such identifier: $id";
 }
 
+sub in_function {
+  my ($scope) = @_;
+  return 1 if $scope->{type} eq 'function';
+  return $scope->{parent}->in_function if $scope->{parent};
+  return 0;
+}
+
 1;

@@ -78,6 +78,43 @@ is_deeply run('
   is $stdout, "0\n1\n2\n", "elements were printed";
 }
 
+{
+  use Capture::Tiny ':all';
+  my $stdout = capture_stdout(sub {
+    is_deeply run('
+(import std (say))
+(def twice
+  (macro (x)
+    `((lambda ()
+      ,x
+      ,x))))
+(twice (say 1))
+1
+'), { type => 'num', value => 1 },
+      'define twice macro';
+  });
+  is $stdout, "1\n1\n", "printed twice";
+}
+
+# TODO
+#
+#    (let a 1 (def x a))
+#    x
+
+is_deeply run('
+(import std (say))
+(def define-alias
+  (macro (as x)
+    `(def ,as
+      (macro (name)
+        `(def ,name ,`,x)))))
+(def x 1)
+(define-alias defx x)
+(defx a)
+a
+'), { type => 'num', value => 1 },
+  'nested quote-unquote';
+
 like(exception { run('`,@1'); }, qr/unquote-splicing outside of a list quasiquote/,
   "Cannot bare unquote-splicing");
 

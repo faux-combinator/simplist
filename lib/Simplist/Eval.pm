@@ -33,10 +33,10 @@ sub is_special_call {
 # TODO forbid (def NAME (def NAME ...))
 sub run_def {
   my ($runtime, $scope, $node) = @_;
-  die "Define is only available at the top-level" if $scope->{parent};
-  die "Define needs a name and a value" unless @{$node->{exprs}} == 3;
+  die "def is only available at the top-level" if $scope->in_function;
+  die "def needs a name and a value" unless @{$node->{exprs}} == 3;
   my ($_kw, $name, $value) = @{$node->{exprs}};
-  die "Define name should be a static identifier" unless $name->{type} eq 'id';
+  die "def name should be a static identifier" unless $name->{type} eq 'id';
   my $result = evaluate_node($runtime, $scope, $value);
   $scope->assign($name->{value}, $result);
   $result
@@ -109,7 +109,7 @@ sub run_list {
   if ($fn->{type} eq 'primitive_fn') {
     return $fn->{value}(@values);
   } else {
-    $runtime->run_lambda_call($scope, $fn, \@values);
+    $runtime->run_lambda_call($scope, $fn, \@values, 'function');
   }
 }
 
@@ -122,11 +122,11 @@ sub check_argument_count {
 
 sub run_lambda_call {
   # $outer_scope is the dynamic scope. we do not need it right now
-  my ($runtime, $outer_scope, $fn, $values) = @_;
+  my ($runtime, $outer_scope, $fn, $values, $type) = @_;
   my $scope = $fn->{scope};
   my @param_names = @{$fn->{param_names}};
 
-  my $new_scope = $scope->child('function');
+  my $new_scope = $scope->child($type);
   my @values = @$values;
   for my $name (@param_names) {
     $new_scope->assign($name, shift @values);
@@ -139,7 +139,7 @@ sub run_lambda_call {
 sub run_macro_call {
   my ($runtime, $outer_scope, $fn, $values) = @_;
   # eval the code in outer_scope, not the macro's scope
-  return $runtime->evaluate_node($outer_scope, run_lambda_call(@_));
+  return $runtime->evaluate_node($outer_scope, run_lambda_call(@_, 'macro'));
 }
 
 # (let NAME VALUE EXPR)
@@ -222,30 +222,41 @@ sub run_id {
 }
 
 sub quasiquote {
-  my ($runtime, $scope, $expr) = @_;
+  my ($runtime, $scope, $depth, $expr) = @_;
   if ($expr->{type} eq 'unquote_splicing') {
     die 'unquote-splicing outside of a list quasiquote';
   } elsif ($expr->{type} eq 'unquote') {
-    evaluate_node($runtime, $scope, $expr->{expr});
+    if ($depth == 0) {
+      evaluate_node($runtime, $scope, $expr->{expr});
+    } else {
+      {type => 'unquote', expr => quasiquote($runtime, $scope, $depth - 1, $expr->{expr})};
+    }
   } elsif ($expr->{type} eq 'list') {
     my @mapped = map {
       if ($_->{type} eq 'unquote_splicing') {
-        my $result = evaluate_node($runtime, $scope, $_->{expr});
-        # Our model is a bit convoluted, so we need this...
-        die 'Unquote-splicing didn\'t result in a list' unless $result->{type} eq 'list';
-        @{$result->{exprs}}
+        if ($depth == 0) {
+          my $result = evaluate_node($runtime, $scope, $_->{expr});
+          # Our model is a bit convoluted, so we need this...
+          die 'Unquote-splicing didn\'t result in a list' unless $result->{type} eq 'list';
+          @{$result->{exprs}}
+        } else {
+          die "NYI broken";
+          quasiquote($runtime, $scope, $depth - 1, $_->{expr});
+        }
       } else {
-        quasiquote($runtime, $scope, $_)
+        quasiquote($runtime, $scope, $depth, $_)
       }
     } @{$expr->{exprs}};
     {type => 'list', exprs => [@mapped]}
+  } elsif ($expr->{type} eq 'quote' || $expr->{type} eq 'quasiquote') {
+    {type => $expr->{type}, expr => quasiquote($runtime, $scope, $depth + 1, $expr->{expr})};
   } else {
     $expr
   }
 }
 sub run_quasiquote {
   my ($runtime, $scope, $node) = @_;
-  quasiquote($runtime, $scope, $node->{expr});
+  quasiquote($runtime, $scope, 0, $node->{expr});
 }
 
 sub run_unquote {
