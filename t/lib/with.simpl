@@ -1,0 +1,4 @@
+(import std (list))
+(export with-it
+  (macro (value body)
+    (list 'let 'it value body)))
