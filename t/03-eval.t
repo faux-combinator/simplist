@@ -5,14 +5,13 @@ use Data::Dump qw(pp);
 use Simplist::Lexer qw(lex);
 use Simplist::Parser qw(parse);
 use Simplist::Eval qw(evaluate);
-#BEGIN { plan tests => 8; }
 my $lib_path = 't/lib/';
 
 sub check {
   my $code = shift;
   my @tokens = lex($code);
   my $parsetree = parse(\@tokens);
-  evaluate($parsetree)
+  evaluate($parsetree, "test")
 }
 
 sub run {
@@ -21,6 +20,31 @@ sub run {
 
 sub exported {
   check(shift)->{export};
+}
+
+sub scrub {
+  my $o = shift;
+  if (ref($o) eq 'HASH') {
+    my %h = %$o;
+    delete @h{"start", "end", "filename"};
+    for my $key (keys %h) {
+      $h{$key} = scrub($h{$key});
+    }
+    \%h
+  } elsif (ref($o) eq 'ARRAY') {
+    my @a = @$o;
+    for (my $i = 0; $i <= $#a; ++$i) {
+      $a[$i] = scrub($a[$i]);
+    }
+    \@a
+  } else {
+    $o
+  }
+}
+
+sub is_deeply_scrubbed {
+  my $got = scrub(shift);
+  is_deeply $got, @_;
 }
 
 is_deeply run('1'), {type => 'num', value => 1},
@@ -115,7 +139,8 @@ is_deeply run('(import std (+ list)) (list 4 (+ 1 2))'), {
   ]}]}]};
 
   is_deeply run('(import std (list)) (list 1 (list 2 (list 3)))'), $deep_list, "A list";
-  is_deeply run("'(1 (2 (3)))"), $deep_list, "A list";
+  # Since we use quote, things aren't evaluated, but we don't want to test locs
+  is_deeply_scrubbed run("'(1 (2 (3)))"), $deep_list, "Nested quoted lists";
 }
 
 # TODO test empty lists
@@ -146,7 +171,8 @@ is_deeply run("(import std (+)) ((eval (eval ''+)))"), {type => 'num', value => 
 is_deeply run("(import std (+)) (eval '(+ 1 (+ 2 3)))"), {type => 'num', value => 6},
   "Eval works at every level";
 
-is_deeply run("(import std (list +)) (eval '(list 1 '(+ 1 2)))"), {
+# Quote stuff, still unevaluated, so remove locs
+is_deeply_scrubbed run("(import std (list +)) (eval '(list 1 '(+ 1 2)))"), {
   type => 'list', exprs => [
     {type => 'num', value => 1},
     {type => 'list', exprs => [
@@ -155,7 +181,8 @@ is_deeply run("(import std (list +)) (eval '(list 1 '(+ 1 2)))"), {
         {type => 'num', value => 2},
 ] } ] }, "Quote in quote works";
 
-is_deeply run("''+"), {type => 'quote', expr => {type => 'id', value => '+'}},
+# Quote stuff, again unevaluated, so remove locs
+is_deeply_scrubbed run("''+"), {type => 'quote', expr => {type => 'id', value => '+'}},
   "Quote will wrap and wrap";
 
 is_deeply run("

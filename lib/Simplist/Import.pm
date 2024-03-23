@@ -20,17 +20,6 @@ my $stdlib = {
     },
   },
 
-  '+' => {
-    type => 'primitive_fn',
-    value => sub {
-      die unless all { $_->{type} eq 'num'; } @_;
-      return {
-        type => 'num',
-        value => sum0(map { $_->{value} } @_)
-      };
-    },
-  },
-
   'list' => {
     type => 'primitive_fn',
     value => sub {
@@ -98,7 +87,7 @@ use Data::Dump qw(pp);
   my $fullpath = "$ENV{SIMPLIST_PATH}/$package.simpl";
   die "File not found: $fullpath" unless -f $fullpath;
   my $content = read_file $fullpath;
-  $loader->($content);
+  $loader->($content, $fullpath);
 }
 
 1

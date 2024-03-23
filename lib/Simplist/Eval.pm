@@ -13,10 +13,21 @@ use Data::Dump qw(pp);
 
 my @specials = qw(let lambda eval macro export import def);
 
+sub _unloc {
+  my ($node) = @_;
+  if (exists $node->{start} || exists $node->{end}) {
+    my %un = %{$node};
+    delete @un{"start", "end", "filename"};
+    \%un
+  } else {
+    $node
+  }
+}
+
 sub evaluate_node {
   my ($runtime, $scope, $node) = @_;
   my $method = "run_$node->{type}";
-  $runtime->$method($scope, $node);
+  _unloc $runtime->$method($scope, $node);
 }
 
 sub evaluate_nodes {
@@ -56,9 +67,10 @@ sub run_export {
 
 # helper used by importer to avoid cycle imports
 sub _import_load {
-  my @tokens = lex(shift);
+  my ($code, $filename) = @_;
+  my @tokens = lex($code);
   my $tree = parse(\@tokens);
-  evaluate($tree)->{export}
+  evaluate($tree, $filename)->{export}
 }
 
 # (import LIBNAME (NAME...))
@@ -107,7 +119,7 @@ sub run_list {
   die "not callable: $fn->{type}" unless $fn->{type} =~ /fn$/;
 
   if ($fn->{type} eq 'primitive_fn') {
-    return $fn->{value}(@values);
+    $fn->{value}(@values);
   } else {
     $runtime->run_lambda_call($scope, $fn, \@values, 'function');
   }
@@ -213,7 +225,7 @@ sub run_primitive_fn {
 
 sub run_num {
   my ($runtime, $scope, $node) = @_;
-  $node;
+  $node
 }
 
 sub run_id {
@@ -241,19 +253,18 @@ sub quasiquote {
           @{$result->{exprs}}
         } else {
           # XXX this should "distribute" over the multiple elements, not sure here or not...
-          #     this impl might work, it might not
           die "NYI nested unquote_splicing";
           {type => 'unquote_splicing', expr => quasiquote($runtime, $scope, $depth - 1, $_->{expr})};
         }
       } else {
-        quasiquote($runtime, $scope, $depth, $_)
+        _unloc quasiquote($runtime, $scope, $depth, $_)
       }
     } @{$expr->{exprs}};
     {type => 'list', exprs => [@mapped]}
   } elsif ($expr->{type} eq 'quote') {
-    {type => 'quote', expr => quasiquote($runtime, $scope, $depth, $expr->{expr})};
+    {type => 'quote', expr => _unloc quasiquote($runtime, $scope, $depth, $expr->{expr})};
   } elsif ($expr->{type} eq 'quasiquote') {
-    {type => 'quasiquote', expr => quasiquote($runtime, $scope, $depth + 1, $expr->{expr})};
+    {type => 'quasiquote', expr => _unloc quasiquote($runtime, $scope, $depth + 1, $expr->{expr})};
   } else {
     $expr
   }
@@ -272,12 +283,15 @@ sub run_unquote_splicing {
 }
 
 sub evaluate {
-  my ($nodes) = @_;
+  my ($nodes, $filename) = @_;
+  for my $node (@$nodes) {
+    $node->{filename} = $filename // "?";
+  }
   my $runtime = bless {modules => {}};
   my $scope = root_scope;
   my @results = evaluate_nodes($runtime, $scope, $nodes);
   # only return the last result
-  return { value => $results[-1], export => $scope->{export} };
+  return { value => _unloc($results[-1]), export => $scope->{export} };
 }
 
 1;
