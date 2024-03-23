@@ -7,6 +7,13 @@ use Data::Dump qw(pp);
 
 @EXPORT_OK = qw(parse);
 
+sub _with_loc {
+  my ($node, $start, $end) = @_;
+  $node->{start} = $start->{start} if $start and exists $start->{start};
+  $node->{end} = $end->{end} if $end and exists $end->{end};
+  $node
+}
+
 sub num {
   shift->expect('num');
 }
@@ -21,10 +28,13 @@ sub literal {
 
 sub call {
   my $parser = shift;
-  $parser->expect('lparen');
+  my $l = $parser->expect('lparen');
   my $exprs = $parser->any_of(\&expr);
-  $parser->expect('rparen');
-  {type => 'list', exprs => $exprs}
+  my $r = $parser->expect('rparen');
+  _with_loc {
+    type => 'list',
+    exprs => $exprs,
+  }, $l, $r;
 }
 
 sub quote_unquote_token {
@@ -42,7 +52,10 @@ sub quote {
   my $quote = $parser->match(\&quote_unquote_token);
   my $expr = $parser->match(\&expr);
 
-  {type => $quote->{type}, expr => $expr}
+  _with_loc {
+    type => $quote->{type},
+    expr => $expr,
+  }, $quote, $quote;
 }
 
 sub expr {

@@ -40,7 +40,6 @@ sub resolve {
   my ($scope, $id) = @_;
   return $scope->{names}{$id} if defined $scope->{names}{$id};
   return $scope->{parent}->resolve($id) if defined $scope->{parent};
-  die "no such identifier: $id";
 }
 
 sub in_function {

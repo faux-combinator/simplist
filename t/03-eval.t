@@ -11,7 +11,7 @@ sub check {
   my $code = shift;
   my @tokens = lex($code);
   my $parsetree = parse(\@tokens);
-  evaluate($parsetree, "test")
+  evaluate($parsetree, "test.simpl")
 }
 
 sub run {
@@ -33,7 +33,7 @@ sub scrub {
     \%h
   } elsif (ref($o) eq 'ARRAY') {
     my @a = @$o;
-    for (my $i = 0; $i <= $#a; ++$i) {
+    for my $i (0 .. $#a) {
       $a[$i] = scrub($a[$i]);
     }
     \@a
@@ -256,7 +256,7 @@ is_deeply run("
 is_deeply run("1 2 3"), {type => 'num', value => 3},
   "can have multiple statements";
 
-like(exception { run('()'); }, qr/invalid call/,
+like(exception { run('()'); }, qr/invalid call: empty call at 1:0 - 1:2/,
   "Empty calls are invalid");
 
 is_deeply run('(def a 1) (def b 2) (import std (+)) (+ a b)'),
@@ -281,7 +281,8 @@ is_deeply check("(import std (+)) (export a 1) (export b (+ a 1)) (+ a b)"), {
   }
 }, "export also exposes the names";
 
-like(exception { run('((lambda () (export a 1)))') }, qr/top-level/,
+# TODO refine position
+like(exception { run('((lambda () (export a 1)))') }, qr/top-level at 1:12 - 1:24/,
   "Cannot have an export inside ane expr");
 
 
@@ -295,16 +296,19 @@ like(exception { run('((lambda () (export a 1)))') }, qr/top-level/,
 #  }
 #}, "export available in let";
 
-like(exception { run('(let x ((lambda () (import std (+)) (+ 1 2))) (+ x x))') },
-  qr/no such identifier: \+/,
+# XXX error
+like(exception { run('(let x ((lambda () (import std (+)) (+ 1 2)))
+(+ x x))') },
+  qr/no such identifier: \+ at 2:1 - 2:2/,
   "imports are local");
 
-like(exception { run('(let m (macro () (import std (list)) \'(list 1 2)) (m))') },
-  qr/no such identifier: list/,
+like(exception { run('(let m (macro () (import std (list))
+\'(list 1 2)) (m))') },
+  qr/no such identifier: list at 2:2 - 2:6/,
   "imports don't cross macro phases");
 
 like(exception { run('(import std (abcdef))') },
-  qr/Package std has no abcdef/,
+  qr/Package std has no abcdef at 1:13 - 1:19/,
   "Cannot import variables that don't exist");
 
 # XXX import-as
@@ -322,7 +326,7 @@ like(exception { run('(import x ())') },
 "), { type => 'num', value => 6 }, "Can import a library!";
 
   like(exception { run('(import mylib (a b)) (+ a b)') },
-    qr/no such identifier: \+/,
+    qr/no such identifier: \+ at 1:22 - 1:23/,
     "Import doesn't pollute the current scope");
 }
 

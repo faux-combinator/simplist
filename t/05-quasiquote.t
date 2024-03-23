@@ -154,6 +154,7 @@ a
   #'), { type => 'num', value => 6 },
   #  'nested quote-splicing_unquote';
 
+# XXX error location
 like(exception { run('`,@1'); }, qr/unquote-splicing outside of a list quasiquote/,
   "Cannot bare unquote-splicing");
 

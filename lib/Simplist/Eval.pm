@@ -15,7 +15,7 @@ my @specials = qw(let lambda eval macro export import def);
 
 sub _unloc {
   my ($node) = @_;
-  if (exists $node->{start} || exists $node->{end}) {
+  if (exists $node->{start} || exists $node->{end} || exists $node->{filename}) {
     my %un = %{$node};
     delete @un{"start", "end", "filename"};
     \%un
@@ -40,14 +40,40 @@ sub is_special_call {
   $fn->{type} eq "id" && any { $_ eq $fn->{value} } @specials;
 }
 
+sub die_with {
+  my ($message, $node) = @_;
+  my ($start, $end);
+
+  # Try to find the boundaries...
+  if (exists $node->{start} and exists $node->{end}) {
+    $start = $node->{start};
+    $end = $node->{end};
+  } elsif ($node->{type} eq 'list' && @{$node->{exprs}}) {
+    my @exprs = @{$node->{exprs}};
+    $start = $exprs[0]{start};
+    $end = $exprs[-1]{end};
+  }
+
+  if (defined $start) {
+    $message .= " at $start->{line}:$start->{column}";
+    if (defined $end) {
+      $message .= " - $end->{line}:$end->{column}";
+    }
+  }
+  if (exists $node->{filename}) {
+    $message .= " in $node->{filename}";
+  }
+  die $message
+}
+
 # (def NAME EXPR)
 # TODO forbid (def NAME (def NAME ...))
 sub run_def {
   my ($runtime, $scope, $node) = @_;
-  die "def is only available at the top-level" if $scope->in_function;
-  die "def needs a name and a value" unless @{$node->{exprs}} == 3;
+  die_with "def is only available at the top-level", $node if $scope->in_function;
+  die_with "def needs a name and a value", $node unless @{$node->{exprs}} == 3;
   my ($_kw, $name, $value) = @{$node->{exprs}};
-  die "def name should be a static identifier" unless $name->{type} eq 'id';
+  die_with "def name should be a static identifier", $node unless $name->{type} eq 'id';
   my $result = evaluate_node($runtime, $scope, $value);
   $scope->assign($name->{value}, $result);
   $result
@@ -56,10 +82,10 @@ sub run_def {
 # (export NAME EXPR)
 sub run_export {
   my ($runtime, $scope, $node) = @_;
-  die "Export is only available at the top-level" if $scope->{parent};
-  die "Export needs a name and a value" unless @{$node->{exprs}} == 3;
+  die_with "Export is only available at the top-level", $node if $scope->{parent};
+  die_with "Export needs a name and a value", $node unless @{$node->{exprs}} == 3;
   my ($_kw, $name, $value) = @{$node->{exprs}};
-  die "Exported name should be a static identifier" unless $name->{type} eq 'id';
+  die_with "Exported name should be a static identifier", $node unless $name->{type} eq 'id';
   my $result = evaluate_node($runtime, $scope, $value);
   $scope->export($name->{value}, $result);
   $result # If it's the last statement
@@ -76,20 +102,20 @@ sub _import_load {
 # (import LIBNAME (NAME...))
 sub run_import {
   my ($runtime, $scope, $node) = @_;
-  die "NYI import-as" if @{$node->{exprs}} == 1;
-  die "Malformed import statement" unless @{$node->{exprs}} == 3;
+  die_with "NYI import-as", $node if @{$node->{exprs}} == 1;
+  die_with "Malformed import statement", $node unless @{$node->{exprs}} == 3;
   my ($_kw, $pkg, $names) = @{$node->{exprs}};
-  die "Exported name should be a static identifier" unless $pkg->{type} eq 'id';
+  die_with "Exported name should be a static identifier", $node unless $pkg->{type} eq 'id';
   my $package = $pkg->{value};
-  die "Import list should be a list" unless $names->{type} eq 'list';
+  die_with "Import list should be a list", $node unless $names->{type} eq 'list';
 
   # Store imports in `modules` so we don't run their side-effects twice
   my $import = $runtime->{modules}{$package} //= resolve_import($package, \&_import_load);
 
-  die "Cannot resolve module $package" unless $import;
+  die_with "Cannot resolve module $package", $node unless $import;
   for my $name (@{$names->{exprs}}) {
-    die "Import name should be an identifier" unless $name->{type} eq 'id';
-    die "Package $package has no $name->{value}" unless exists $import->{$name->{value}};
+    die_with "Import name should be an identifier", $name unless $name->{type} eq 'id';
+    die_with "Package $package has no $name->{value}", $name unless exists $import->{$name->{value}};
     $scope->assign($name->{value}, $import->{$name->{value}});
   }
 
@@ -103,7 +129,7 @@ sub run_import {
 #  and probably the dispatch on fn/primitive_call
 sub run_list {
   my ($runtime, $scope, $node) = @_;
-  die "invalid call: empty call" unless @{$node->{exprs}};
+  die_with "invalid call: empty call", $node unless @{$node->{exprs}};
   my @exprs = @{$node->{exprs}};
   my $fn = shift @exprs;
   if (is_special_call($fn)) {
@@ -116,7 +142,7 @@ sub run_list {
     return $runtime->run_macro_call($scope, $fn, \@exprs);
   }
   my @values = evaluate_nodes($runtime, $scope, \@exprs);
-  die "not callable: $fn->{type}" unless $fn->{type} =~ /fn$/;
+  die_with "not callable: $fn->{type}", $fn unless $fn->{type} =~ /fn$/;
 
   if ($fn->{type} eq 'primitive_fn') {
     $fn->{value}(@values);
@@ -158,7 +184,7 @@ sub run_macro_call {
 sub run_let {
   my ($runtime, $scope, $node) = @_;
   my ($_kw, $name, $value, $expr) = @{$node->{exprs}};
-  die "cannot let a non-id" unless $name->{type} eq "id";
+  die_with "cannot let a non-id", $name unless $name->{type} eq "id";
   my $new_scope = $scope->child('let');
   $new_scope->assign($name->{value}, evaluate_node($runtime, $scope, $value));
   return evaluate_node($runtime, $new_scope, $expr);
@@ -169,7 +195,7 @@ sub run_eval {
   my ($runtime, $scope, $node) = @_;
   my @exprs = @{$node->{exprs}};
   shift @exprs; # Remove `eval`
-  die "eval can only eval one thing" if @exprs != 1;
+  die_with "eval can only eval one thing", $node if @exprs != 1;
   
   my ($expr) = @exprs;
   my $result = evaluate_node($runtime, $scope, $expr);
@@ -182,13 +208,15 @@ sub run_lambda {
   # extract scope, parameters and body
   my @parts = @{$node->{exprs}};
   shift @parts; # remove `lambda`
-  die 'invalid syntax to lambda' if scalar @parts < 2;
+  die_with 'invalid syntax to lambda', $node if scalar @parts < 2;
 
   # the first () is the params, the 2nd is the body
   my ($params, @body) = @parts;
 
   my @params = @{$params->{exprs}};
-  die 'parameters must be identifiers' if any { $_->{type} ne 'id' } @params;
+  for my $param (@params) {
+    die_with 'parameters must be identifiers', $param unless $param->{type} eq 'id';
+  }
   my @param_names = map { $_->{value} } @params;
   $node->{param_names} = \@param_names;
 
@@ -230,13 +258,15 @@ sub run_num {
 
 sub run_id {
   my ($runtime, $scope, $node) = @_;
-  $scope->resolve($node->{value});
+  my $value = $scope->resolve($node->{value});
+  die_with "no such identifier: $node->{value}", $node unless $value;
+  $value;
 }
 
 sub quasiquote {
   my ($runtime, $scope, $depth, $expr) = @_;
   if ($expr->{type} eq 'unquote_splicing') {
-    die 'unquote-splicing outside of a list quasiquote';
+    die_with 'unquote-splicing outside of a list quasiquote', $expr;
   } elsif ($expr->{type} eq 'unquote') {
     if ($depth == 0) {
       evaluate_node($runtime, $scope, $expr->{expr});
@@ -283,15 +313,12 @@ sub run_unquote_splicing {
 }
 
 sub evaluate {
-  my ($nodes, $filename) = @_;
-  for my $node (@$nodes) {
-    $node->{filename} = $filename // "?";
-  }
+  my $nodes = shift;
   my $runtime = bless {modules => {}};
   my $scope = root_scope;
   my @results = evaluate_nodes($runtime, $scope, $nodes);
   # only return the last result
-  return { value => _unloc($results[-1]), export => $scope->{export} };
+  return { value => $results[-1], export => $scope->{export} };
 }
 
 1;
